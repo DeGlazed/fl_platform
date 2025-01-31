@@ -1,12 +1,14 @@
-from kafka.admin import KafkaAdminClient, NewTopic
+from kafka.admin import KafkaAdminClient
 from kafka import KafkaConsumer, KafkaProducer
 import json
 import time
 import threading
-import random
-from enum import Enum
 from fl_platform.src.utils.client_manager import ClientManager, ClientState
 from fl_platform.src.strategy.fed_fa import FedFA
+from collections import OrderedDict
+import torch
+
+from model import Net
 
 admin_client = KafkaAdminClient(
     bootstrap_servers="localhost:29092", 
@@ -34,8 +36,12 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
+MIN_CLIENTS = 2
 client_manager = ClientManager()
-strategy = FedFA(client_manager, 2)
+strategy = FedFA(client_manager, MIN_CLIENTS)
+
+model = Net()
+init_params = [val.cpu().numpy().tolist() for _, val in model.state_dict().items()]
 
 def startClientHandler() :
     while True:
@@ -67,16 +73,22 @@ def startFLStrategy(min_clinets_connected) :
     #send init params to min_clients_connected randomly selected clients
 
     print(f"Sending initial params to {min_clinets_connected} clients...")
-    initial_population = client_manager.sample_ready_clients(min_clinets_connected)
+    initial_population = strategy.get_initial_situation()
+
     for client_id in initial_population:
-        params = {'param1': 1, 'param2': 2}
-        response = {'client_id': client_id, 'params': params}
+        print(f"Sending initial params to client {client_id}...")
+        response = {'client_id': client_id, 'params': init_params}
+
+        # response_size = len(json.dumps(response).encode('utf-8')) / (1024 * 1024)
+        # print(f"Response size: {response_size:.2f} MB")
+
         producer.send('global-models', value=response)
         producer.flush()
         client_manager.set_client_state(client_id, ClientState.BUSY)
 
     #Handle client responses
     while True:
+        print("Waiting for local params from clients...")
         try:
             state = local_models_consumer.poll(timeout_ms=1000)
             if state:
@@ -89,22 +101,34 @@ def startFLStrategy(min_clinets_connected) :
 
                             client_manager.set_client_state(client_id, ClientState.FINISHED)
 
-                            # Do something with the params
-                            # Simulating params processing by sleeping for 5 seconds
-                            print(f"Processing params of {client_id}...")
-                            time.sleep(5)
-                            print(f"Finished processing params of {client_id}")
+                            params_dict = zip(model.state_dict().keys(), params)
+                            state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
 
-                            # Send global params to random client in READY state
-                            random_client_ids = client_manager.sample_ready_clients(1)
-                            random_client_id = random_client_ids[0] if random_client_ids else None
-                            if(random_client_id):
-                                print(f"Sending global params to client {random_client_id}...")
-                                params = {'param1': 1, 'param2': 2}
-                                response = {'client_id': random_client_id, 'params': params}
+                            print(f"Processing params of {client_id}...")
+                            
+                            new_client_id, new_global_dict = strategy.agregate(state_dict)
+                            if(new_client_id):
+                                print(f"Sending global params to client {new_client_id}...")
+
+                                params = [val.cpu().numpy().tolist() for _, val in new_global_dict.items()]
+
+                                response = {'client_id': new_client_id, 'params': params}
                                 producer.send('global-models', value=response)
                                 producer.flush()
-                                client_manager.set_client_state(random_client_id, ClientState.BUSY)
+                                client_manager.set_client_state(new_client_id, ClientState.BUSY)
+
+                            print(f"Finished processing params of {client_id}")
+
+                            # # Send global params to random client in READY state
+                            # random_client_ids = client_manager.sample_ready_clients(1)
+                            # random_client_id = random_client_ids[0] if random_client_ids else None
+                            # if(random_client_id):
+                            #     print(f"Sending global params to client {random_client_id}...")
+                            #     params = {'param1': 1, 'param2': 2}
+                            #     response = {'client_id': random_client_id, 'params': params}
+                            #     producer.send('global-models', value=response)
+                            #     producer.flush()
+                            #     client_manager.set_client_state(random_client_id, ClientState.BUSY)
 
                             client_manager.set_client_state(client_id, ClientState.READY)      
 
@@ -114,10 +138,9 @@ def startFLStrategy(min_clinets_connected) :
         time.sleep(2)
 
 if __name__ == '__main__':
-    min_clients_connected = 2
 
     client_handler_thread = threading.Thread(target=startClientHandler)
-    fl_strategy_thread = threading.Thread(target=startFLStrategy, args=(min_clients_connected,))
+    fl_strategy_thread = threading.Thread(target=startFLStrategy, args=(MIN_CLIENTS,))
 
     client_handler_thread.start()
     fl_strategy_thread.start()
