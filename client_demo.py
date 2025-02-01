@@ -9,6 +9,7 @@ from model import Net, train
 from dataset import load_data
 from collections import OrderedDict
 import torch
+import argparse
 
 global_models_consumer = KafkaConsumer(
     'global-models',
@@ -24,7 +25,15 @@ producer = KafkaProducer(
 )
 
 model = Net()
-TRAINLOADER, VALLOADER, TESTLOADER = load_data(0, 2)
+
+parser = argparse.ArgumentParser(description='Client for federated learning platform.')
+parser.add_argument("--cid", type=int, required=True, help="Client ID")
+parser.add_argument("--num_cli", type=int, required=True, help="Number of clients")
+args = parser.parse_args()
+
+CID = args.cid
+NUM_CLI = args.num_cli
+TRAINLOADER, TESTLOADER = load_data(CID, NUM_CLI)
 
 if __name__ == '__main__':
     # Send server initiative to join
@@ -38,7 +47,7 @@ if __name__ == '__main__':
     id = id[:5]
 
     print(f"I am {id}")
-    print("Sending state...")
+    # print("Sending state...")
     response = {'state': 'CONNECT', 'client_id': id}
     producer.send('client-logs', value=response)
     producer.flush()
@@ -46,7 +55,7 @@ if __name__ == '__main__':
     # Receive global params for this client
 
     while True:
-        print("Waiting for task...")
+        # print("Waiting for task...")
 
         try:
             state = global_models_consumer.poll(timeout_ms=1000)
@@ -61,11 +70,20 @@ if __name__ == '__main__':
                             state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
                             model.load_state_dict(state_dict, strict=True)
 
-                            print("Training model...")
-                            
-                            train(model, TRAINLOADER, VALLOADER, 10)
+                            print(f"{client_id} training model...")
 
-                            print("Model trained, sending local params back to server...")
+                            train_size = int(0.8 * len(TRAINLOADER.dataset))
+                            val_size = len(TRAINLOADER.dataset) - train_size
+    
+                            train_subset, val_subset = torch.utils.data.random_split(TRAINLOADER.dataset, [train_size, val_size])
+                           
+                            trainloader = torch.utils.data.DataLoader(train_subset, batch_size=64, shuffle=True)
+                            valloader = torch.utils.data.DataLoader(val_subset, batch_size=64, shuffle=False)
+                            
+                            results = train(model, trainloader, valloader, 10)
+                            print(f"{client_id} results: {results}")
+                            
+                            # print("Model trained, sending local params back to server...")
                             # Send local params back to server
 
                             params = [val.cpu().numpy().tolist() for _, val in model.state_dict().items()]

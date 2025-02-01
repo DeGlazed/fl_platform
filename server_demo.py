@@ -7,6 +7,7 @@ from fl_platform.src.utils.client_manager import ClientManager, ClientState
 from fl_platform.src.strategy.fed_fa import FedFA
 from collections import OrderedDict
 import torch
+import argparse
 
 from model import Net
 
@@ -36,7 +37,11 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
-MIN_CLIENTS = 2
+parser = argparse.ArgumentParser(description='Server for federated learning platform.')
+parser.add_argument("--min_cli", type=int, required=True, help="Min Number Of Clients")
+args = parser.parse_args()
+
+MIN_CLIENTS = args.min_cli
 client_manager = ClientManager()
 strategy = FedFA(client_manager, MIN_CLIENTS)
 
@@ -88,7 +93,7 @@ def startFLStrategy(min_clinets_connected) :
 
     #Handle client responses
     while True:
-        print("Waiting for local params from clients...")
+        # print("Waiting for local params from clients...")
         try:
             state = local_models_consumer.poll(timeout_ms=1000)
             if state:
@@ -118,17 +123,6 @@ def startFLStrategy(min_clinets_connected) :
                                 client_manager.set_client_state(new_client_id, ClientState.BUSY)
 
                             print(f"Finished processing params of {client_id}")
-
-                            # # Send global params to random client in READY state
-                            # random_client_ids = client_manager.sample_ready_clients(1)
-                            # random_client_id = random_client_ids[0] if random_client_ids else None
-                            # if(random_client_id):
-                            #     print(f"Sending global params to client {random_client_id}...")
-                            #     params = {'param1': 1, 'param2': 2}
-                            #     response = {'client_id': random_client_id, 'params': params}
-                            #     producer.send('global-models', value=response)
-                            #     producer.flush()
-                            #     client_manager.set_client_state(random_client_id, ClientState.BUSY)
 
                             client_manager.set_client_state(client_id, ClientState.READY)      
 

@@ -23,7 +23,7 @@ from dataset import load_data
 net = Net()
 model_dir = "model_states"
 model_files = sorted(os.listdir(model_dir), key=lambda x: int(x.split('_')[-1].split('.')[0]))
-TRAINLOADER, VALLOADER, TESTLOADER = load_data(0, 2)
+TRAINLOADER, TESTLOADER = load_data(0, 2)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 criterion = torch.nn.CrossEntropyLoss().to(device)
 net = net.to(device)
@@ -45,4 +45,4 @@ for model_file in model_files:
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-    print(f"Model: {model_file}, Validation Loss: {val_loss/len(TESTLOADER)}, Accuracy: {100 * correct / total}%")
+    print(f"Model: {model_file}, Test Loss: {val_loss/len(TESTLOADER)}, Accuracy: {100 * correct / total}%")
