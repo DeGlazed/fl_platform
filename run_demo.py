@@ -18,13 +18,14 @@ def run_subprocess(command, cwd):
 
 print(f"Running Server")
 server_process = run_subprocess(["python", "server_demo.py", "--min_cli", str(MIN_CLIENTS)], base_dir)
-time.sleep(10)  # Give the server some time to start
+time.sleep(5)  # Give the server some time to start
 print(f"Running Clients")
 
 client_processes = []
 for i in range(NUM_CLI):
     client_process = run_subprocess(["python", "client_demo.py", "--cid", str(i), "--num_cli", str(NUM_CLI)], base_dir)
     client_processes.append(client_process)
+    time.sleep(1)  # Give the client some time to start
 
 server_process.wait()
 

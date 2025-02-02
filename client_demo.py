@@ -6,7 +6,7 @@ import hashlib
 import uuid
 
 from model import Net, train
-from dataset import load_data
+from dataset import load_data, load_data_non_iid
 from collections import OrderedDict
 import torch
 import argparse
@@ -34,6 +34,7 @@ args = parser.parse_args()
 CID = args.cid
 NUM_CLI = args.num_cli
 TRAINLOADER, TESTLOADER = load_data(CID, NUM_CLI)
+# TRAINLOADER, TESTLOADER = load_data_non_iid(CID, NUM_CLI)
 
 if __name__ == '__main__':
     # Send server initiative to join

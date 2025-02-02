@@ -1,0 +1,674 @@
+I am 9c5c2
+9c5c2 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+9c5c2 results: {'train_loss': 37.20077043771744, 'train_accuracy': 0.85625, 'val_loss': 9.391556441783905, 'val_accuracy': 0.8541666666666666}
+9c5c2 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+9c5c2 results: {'train_loss': 7.119493883103132, 'train_accuracy': 0.9729166666666667, 'val_loss': 2.6297030225396156, 'val_accuracy': 0.9558333333333333}
+9c5c2 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+9c5c2 results: {'train_loss': 4.648891816381365, 'train_accuracy': 0.983125, 'val_loss': 1.9275250881910324, 'val_accuracy': 0.9666666666666667}
+9c5c2 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+9c5c2 results: {'train_loss': 2.1564598185941577, 'train_accuracy': 0.9925, 'val_loss': 1.1173575269058347, 'val_accuracy': 0.985}
+I am 34f18
+34f18 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+34f18 results: {'train_loss': 5.566240321844816, 'train_accuracy': 0.9802083333333333, 'val_loss': 1.8097787536680698, 'val_accuracy': 0.9675}
+34f18 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+34f18 results: {'train_loss': 2.9152563773095608, 'train_accuracy': 0.9883333333333333, 'val_loss': 1.4195985160768032, 'val_accuracy': 0.9791666666666666}
+34f18 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+34f18 results: {'train_loss': 2.478561193216592, 'train_accuracy': 0.99125, 'val_loss': 1.1715731769800186, 'val_accuracy': 0.9775}
+34f18 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+34f18 results: {'train_loss': 2.259607729036361, 'train_accuracy': 0.9925, 'val_loss': 1.036759965121746, 'val_accuracy': 0.9858333333333333}
+34f18 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+I am 3327d
+3327d training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3327d results: {'train_loss': 6.932020529173315, 'train_accuracy': 0.9747916666666666, 'val_loss': 2.582330536097288, 'val_accuracy': 0.9508333333333333}
+3327d training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3327d results: {'train_loss': 5.583498014137149, 'train_accuracy': 0.9804166666666667, 'val_loss': 2.0495432652533054, 'val_accuracy': 0.9641666666666666}
+3327d training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3327d results: {'train_loss': 3.716777310706675, 'train_accuracy': 0.9864583333333333, 'val_loss': 2.2374665550887585, 'val_accuracy': 0.9666666666666667}
+3327d training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3327d results: {'train_loss': 3.3836128655821085, 'train_accuracy': 0.9845833333333334, 'val_loss': 1.897274136543274, 'val_accuracy': 0.9633333333333334}
+3327d training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3327d results: {'train_loss': 2.2126934248954058, 'train_accuracy': 0.9922916666666667, 'val_loss': 1.173281978815794, 'val_accuracy': 0.9833333333333333}
+I am c6912
+c6912 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+c6912 results: {'train_loss': 7.0834939405322075, 'train_accuracy': 0.9689583333333334, 'val_loss': 3.2700284719467163, 'val_accuracy': 0.9416666666666667}
+c6912 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+c6912 results: {'train_loss': 4.4175615147687495, 'train_accuracy': 0.98, 'val_loss': 1.9165022633969784, 'val_accuracy': 0.9708333333333333}
+c6912 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+c6912 results: {'train_loss': 3.4946057433262467, 'train_accuracy': 0.9866666666666667, 'val_loss': 1.3945617587305605, 'val_accuracy': 0.9758333333333333}
+I am 5ab65
+5ab65 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+5ab65 results: {'train_loss': 31.475411787629128, 'train_accuracy': 0.879375, 'val_loss': 8.849735498428345, 'val_accuracy': 0.8625}
+5ab65 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+5ab65 results: {'train_loss': 13.841102492064238, 'train_accuracy': 0.9458333333333333, 'val_loss': 4.566096864640713, 'val_accuracy': 0.9216666666666666}
+5ab65 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+5ab65 results: {'train_loss': 7.190529552288353, 'train_accuracy': 0.9722916666666667, 'val_loss': 2.8663539811968803, 'val_accuracy': 0.9616666666666667}
+5ab65 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+5ab65 results: {'train_loss': 4.123378817457706, 'train_accuracy': 0.984375, 'val_loss': 1.5112197678536177, 'val_accuracy': 0.9783333333333334}
+5ab65 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+5ab65 results: {'train_loss': 3.4802024555392563, 'train_accuracy': 0.9872916666666667, 'val_loss': 1.7543360209092498, 'val_accuracy': 0.9741666666666666}
+5ab65 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+5ab65 results: {'train_loss': 2.563098883256316, 'train_accuracy': 0.990625, 'val_loss': 1.35663593839854, 'val_accuracy': 0.9791666666666666}
+I am e20e9
+e20e9 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+e20e9 results: {'train_loss': 14.587826021015644, 'train_accuracy': 0.9425, 'val_loss': 4.409708812832832, 'val_accuracy': 0.9341666666666667}
+e20e9 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+e20e9 results: {'train_loss': 4.203460686840117, 'train_accuracy': 0.9827083333333333, 'val_loss': 2.295201487839222, 'val_accuracy': 0.9633333333333334}
+e20e9 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+e20e9 results: {'train_loss': 3.3443858926184475, 'train_accuracy': 0.98875, 'val_loss': 0.9131751889362931, 'val_accuracy': 0.9866666666666667}
+e20e9 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+e20e9 results: {'train_loss': 2.8430074714124203, 'train_accuracy': 0.990625, 'val_loss': 1.0695167044177651, 'val_accuracy': 0.9808333333333333}
+e20e9 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+e20e9 results: {'train_loss': 1.8936328436248004, 'train_accuracy': 0.9960416666666667, 'val_loss': 1.2014648830518126, 'val_accuracy': 0.98}
+I am 3f7e1
+3f7e1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3f7e1 results: {'train_loss': 32.82211035490036, 'train_accuracy': 0.8716666666666667, 'val_loss': 9.037004262208939, 'val_accuracy': 0.8616666666666667}
+3f7e1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3f7e1 results: {'train_loss': 13.963976867496967, 'train_accuracy': 0.9466666666666667, 'val_loss': 3.7125827819108963, 'val_accuracy': 0.9425}
+3f7e1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3f7e1 results: {'train_loss': 9.130383972078562, 'train_accuracy': 0.9658333333333333, 'val_loss': 3.1320518031716347, 'val_accuracy': 0.9466666666666667}
+3f7e1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3f7e1 results: {'train_loss': 3.3858200600370765, 'train_accuracy': 0.988125, 'val_loss': 1.9550796542316675, 'val_accuracy': 0.9741666666666666}
+3f7e1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+3f7e1 results: {'train_loss': 2.7653545634821057, 'train_accuracy': 0.9904166666666666, 'val_loss': 1.6246908912435174, 'val_accuracy': 0.98}
+I am afdc2
+afdc2 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+afdc2 results: {'train_loss': 31.020693838596344, 'train_accuracy': 0.8802083333333334, 'val_loss': 8.427722156047821, 'val_accuracy': 0.87}
+afdc2 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+afdc2 results: {'train_loss': 17.059235617518425, 'train_accuracy': 0.9320833333333334, 'val_loss': 5.633716821670532, 'val_accuracy': 0.9166666666666666}
+afdc2 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+afdc2 results: {'train_loss': 2.3420869819819927, 'train_accuracy': 0.9927083333333333, 'val_loss': 1.652076673693955, 'val_accuracy': 0.9758333333333333}
+I am 15dc1
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 18.61192762851715, 'train_accuracy': 0.9241666666666667, 'val_loss': 4.761239841580391, 'val_accuracy': 0.9125}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 12.256445720791817, 'train_accuracy': 0.951875, 'val_loss': 3.5820192992687225, 'val_accuracy': 0.9475}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 10.268420297652483, 'train_accuracy': 0.9610416666666667, 'val_loss': 3.2134651131927967, 'val_accuracy': 0.9458333333333333}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 8.228293031454086, 'train_accuracy': 0.969375, 'val_loss': 2.518454359844327, 'val_accuracy': 0.9641666666666666}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 4.480214025825262, 'train_accuracy': 0.985, 'val_loss': 1.7945317160338163, 'val_accuracy': 0.975}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 3.277055817656219, 'train_accuracy': 0.9885416666666667, 'val_loss': 1.4855059585534036, 'val_accuracy': 0.9766666666666667}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 2.718228943180293, 'train_accuracy': 0.9895833333333334, 'val_loss': 1.662861811928451, 'val_accuracy': 0.975}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 2.3675825828686357, 'train_accuracy': 0.9910416666666667, 'val_loss': 1.4230960961431265, 'val_accuracy': 0.9758333333333333}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 2.5008285930380225, 'train_accuracy': 0.990625, 'val_loss': 1.0564445876516402, 'val_accuracy': 0.9825}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 2.1219800407998264, 'train_accuracy': 0.993125, 'val_loss': 1.0968600823543966, 'val_accuracy': 0.9766666666666667}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 1.5897025391459465, 'train_accuracy': 0.9960416666666667, 'val_loss': 0.8981972839683294, 'val_accuracy': 0.985}
+15dc1 training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+15dc1 results: {'train_loss': 1.4191948912339285, 'train_accuracy': 0.9964583333333333, 'val_loss': 1.1071132370270789, 'val_accuracy': 0.9825}
+I am b756b
+b756b training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+b756b results: {'train_loss': 34.241163462400436, 'train_accuracy': 0.8610416666666667, 'val_loss': 9.459434628486633, 'val_accuracy': 0.8533333333333334}
+b756b training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+b756b results: {'train_loss': 10.064020551741123, 'train_accuracy': 0.959375, 'val_loss': 3.499392695724964, 'val_accuracy': 0.9441666666666667}
+b756b training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+b756b results: {'train_loss': 5.821762987412512, 'train_accuracy': 0.979375, 'val_loss': 2.473827514797449, 'val_accuracy': 0.9583333333333334}
+b756b training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+b756b results: {'train_loss': 5.559722077101469, 'train_accuracy': 0.9789583333333334, 'val_loss': 1.6897566765546799, 'val_accuracy': 0.9733333333333334}
+b756b training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+b756b results: {'train_loss': 4.818411554209888, 'train_accuracy': 0.9797916666666666, 'val_loss': 1.5775761399418116, 'val_accuracy': 0.9783333333333334}
+b756b training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+b756b results: {'train_loss': 3.3879970889538527, 'train_accuracy': 0.9877083333333333, 'val_loss': 1.2484682966023684, 'val_accuracy': 0.9766666666666667}
+b756b training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+b756b results: {'train_loss': 3.0451757479459047, 'train_accuracy': 0.9895833333333334, 'val_loss': 1.0338802789337933, 'val_accuracy': 0.9825}
+b756b training model...
+Epoch 1
+Epoch 2
+Epoch 3
+Epoch 4
+Epoch 5
+Epoch 6
+Epoch 7
+Epoch 8
+Epoch 9
+Epoch 10
+b756b results: {'train_loss': 2.435180824715644, 'train_accuracy': 0.99, 'val_loss': 1.5011991907376796, 'val_accuracy': 0.9775}

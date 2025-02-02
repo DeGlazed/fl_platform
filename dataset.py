@@ -62,21 +62,10 @@ def load_data_non_iid(partition_id, num_partitions):
     train_split.dataset.transform = pytorch_transforms
     TEST_DATASET.transform = pytorch_transforms
 
-     # Split trainloader into train and validation subsets
     trainloader = DataLoader(train_split, batch_size=64, shuffle=True)
-    
-    train_size = int(0.8 * len(trainloader.dataset))
-    val_size = len(trainloader.dataset) - train_size
-    
-    train_subset, val_subset = torch.utils.data.random_split(trainloader.dataset, [train_size, val_size])
-
-    trainloader = torch.utils.data.DataLoader(train_subset, batch_size=64, shuffle=True)
-    
-    valloader = torch.utils.data.DataLoader(val_subset, batch_size=64, shuffle=False)
-
     testloader = DataLoader(TEST_DATASET, batch_size=64, shuffle=False)
 
-    return trainloader, valloader, testloader
+    return trainloader, testloader
 
 if __name__ == "__main__" :
     trainloader, valloader, testloader = load_data_non_iid(0, 2)
