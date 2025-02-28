@@ -3,6 +3,7 @@ from model import Net
 import torch
 import os
 from dataset import load_data, load_data_non_iid
+import csv
 
 # admin_client = KafkaAdminClient(
 #     bootstrap_servers="localhost:29092", 
@@ -21,7 +22,7 @@ from dataset import load_data, load_data_non_iid
 # # print(admin_client.list_topics())
 
 net = Net()
-model_dir = "model_states_non_iid"
+model_dir = "model_states_iid"
 model_files = sorted(os.listdir(model_dir), key=lambda x: int(x.split('_')[-1].split('.')[0]))
 # TRAINLOADER, TESTLOADER = load_data(0, 2)
 TRAINLOADER, TESTLOADER = load_data_non_iid(0, 2)
@@ -46,4 +47,12 @@ for model_file in model_files:
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-    print(f"Model: {model_file}, Test Loss: {val_loss/len(TESTLOADER)}, Accuracy: {100 * correct / total}%")
+    csv_file = "model_evaluation_results.csv"
+    file_exists = os.path.isfile(csv_file)
+
+    with open(csv_file, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(["Model", "Test Loss", "Accuracy"])
+        writer.writerow([model_file, val_loss/len(TESTLOADER), 100 * correct / total])
+    # print(f"Model: {model_file}, Test Loss: {val_loss/len(TESTLOADER)}, Accuracy: {100 * correct / total}%")

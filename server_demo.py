@@ -134,10 +134,12 @@ def startFLStrategy(min_clinets_connected) :
 if __name__ == '__main__':
 
     client_handler_thread = threading.Thread(target=startClientHandler)
+    client_handler_thread.daemon = True
     fl_strategy_thread = threading.Thread(target=startFLStrategy, args=(MIN_CLIENTS,))
+    fl_strategy_thread.daemon = True
 
     client_handler_thread.start()
     fl_strategy_thread.start()
 
-    client_handler_thread.join()
-    fl_strategy_thread.join()
+    while True:
+        time.sleep(1)
