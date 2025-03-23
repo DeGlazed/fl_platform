@@ -11,18 +11,7 @@ import argparse
 
 from model import Net
 
-admin_client = KafkaAdminClient(
-    bootstrap_servers="localhost:29092", 
-    client_id='test'
-)
-
-client_logs_consumer = KafkaConsumer(
-    'client-logs',
-    bootstrap_servers='localhost:29092',
-    auto_offset_reset='latest',
-    enable_auto_commit=True,
-    value_deserializer=lambda x: json.loads(x.decode('utf-8'))
-)
+from fl_platform.src.utils.message_utils import ServerSimpleMessageHandler
 
 local_models_consumer = KafkaConsumer(
     'local-models',
@@ -48,23 +37,17 @@ strategy = FedFA(client_manager, MIN_CLIENTS)
 model = Net()
 init_params = [val.cpu().numpy().tolist() for _, val in model.state_dict().items()]
 
-def startClientHandler() :
+def startClientHandler(message_handler) :
     while True:
         # Handle client connections
-        try:
-            state = client_logs_consumer.poll(timeout_ms=1000)
-            if state:
-                for tp, states in state.items():
-                    for msg in states:
-                        client_id = msg.value.get('client_id')
-                        if client_id:
+        results = message_handler.consume_client_logs_message(1000)
+        if(results):
+            for cli_id, msg in results :
+                if cli_id:
+                    print(f"Client {cli_id} connected")
+                    client_manager.add_client(cli_id)
 
-                            client_manager.add_client(client_id)
-
-        except Exception as e:
-            print(e)
-
-def startFLStrategy(min_clinets_connected) :
+def startFLStrategy(message_handler, min_clinets_connected) :
     while True:
         #check for required number of clients connected
         ready_clinets_count = len(client_manager.get_all_ready_clients())
@@ -87,55 +70,49 @@ def startFLStrategy(min_clinets_connected) :
         # response_size = len(json.dumps(response).encode('utf-8')) / (1024 * 1024)
         # print(f"Response size: {response_size:.2f} MB")
 
-        producer.send('global-models', value=response)
-        producer.flush()
+        message_handler.send_message(response)
         client_manager.set_client_state(client_id, ClientState.BUSY)
 
     #Handle client responses
     while True:
         # print("Waiting for local params from clients...")
-        try:
-            state = local_models_consumer.poll(timeout_ms=1000)
-            if state:
-                for tp, states in state.items():
-                    for msg in states:
-                        client_id = msg.value.get('client_id')
-                        if client_id:
-                            params = msg.value.get('params')
-                            print(f"Received local params from client {client_id}")
 
-                            client_manager.set_client_state(client_id, ClientState.FINISHED)
+        results = message_handler.consume_local_model_message(1000)
+        if results: 
+            for client_id, msg in results:
+                params = msg.value.get('params')
+                print(f"Received local params from client {client_id}")
 
-                            params_dict = zip(model.state_dict().keys(), params)
-                            state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+                client_manager.set_client_state(client_id, ClientState.FINISHED)
 
-                            print(f"Processing params of {client_id}...")
-                            
-                            new_client_id, new_global_dict = strategy.agregate(state_dict)
-                            if(new_client_id):
-                                print(f"Sending global params to client {new_client_id}...")
+                params_dict = zip(model.state_dict().keys(), params)
+                state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
 
-                                params = [val.cpu().numpy().tolist() for _, val in new_global_dict.items()]
+                print(f"Processing params of {client_id}...")
+                
+                new_client_id, new_global_dict = strategy.agregate(state_dict)
+                if(new_client_id):
+                    print(f"Sending global params to client {new_client_id}...")
 
-                                response = {'client_id': new_client_id, 'params': params}
-                                producer.send('global-models', value=response)
-                                producer.flush()
-                                client_manager.set_client_state(new_client_id, ClientState.BUSY)
+                    params = [val.cpu().numpy().tolist() for _, val in new_global_dict.items()]
 
-                            print(f"Finished processing params of {client_id}")
+                    response = {'client_id': new_client_id, 'params': params}
+                    message_handler.send_message(response)
+                    client_manager.set_client_state(new_client_id, ClientState.BUSY)
 
-                            client_manager.set_client_state(client_id, ClientState.READY)      
+                print(f"Finished processing params of {client_id}")
 
-        except Exception as e:
-            print(e)
-        
+                client_manager.set_client_state(client_id, ClientState.READY)      
+                
         time.sleep(2)
 
 if __name__ == '__main__':
 
-    client_handler_thread = threading.Thread(target=startClientHandler)
+    message_handler = ServerSimpleMessageHandler("localhost:29092", "global-models", "local-models", "client-logs")
+
+    client_handler_thread = threading.Thread(target=startClientHandler, args=(message_handler,))
     client_handler_thread.daemon = True
-    fl_strategy_thread = threading.Thread(target=startFLStrategy, args=(MIN_CLIENTS,))
+    fl_strategy_thread = threading.Thread(target=startFLStrategy, args=(message_handler, MIN_CLIENTS,))
     fl_strategy_thread.daemon = True
 
     client_handler_thread.start()
