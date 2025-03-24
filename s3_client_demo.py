@@ -11,6 +11,21 @@ import argparse
 from fl_platform.src.utils.message_utils import ClientSimpleMessageHandler
 import logging
 
+import os
+import boto3
+
+# Configure LocalStack
+os.environ['AWS_ACCESS_KEY_ID'] = 'test'
+os.environ['AWS_SECRET_ACCESS_KEY'] = 'test'
+os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
+localstack_endpoint = 'http://localhost:4566'
+
+# Create S3 client
+s3 = boto3.client('s3', endpoint_url=localstack_endpoint)
+
+# Create a bucket
+bucket_name = 'your-bucket'
+
 model = Net()
 
 parser = argparse.ArgumentParser(description='Client for federated learning platform.')
@@ -42,7 +57,6 @@ if __name__ == '__main__':
     # Receive global params for this client
 
     while True:
-        # print("Waiting for task...")
 
         try:
             responses = message_handler.consume_message(1000)
@@ -50,9 +64,9 @@ if __name__ == '__main__':
                 for msg in responses:
                     params = msg.value.get('params')
                     
-                    params_dict = zip(model.state_dict().keys(), params)
-                    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-                    model.load_state_dict(state_dict, strict=True)
+                    s3.download_file(bucket_name, params, params)
+                    model.load_state_dict(torch.load(params))
+                    os.remove(params)
 
                     logging.info(f"Client {id} training model...")
 
@@ -68,9 +82,14 @@ if __name__ == '__main__':
                     
                     # Send local params back to server
 
-                    params = [val.cpu().numpy().tolist() for _, val in model.state_dict().items()]
+                    data = f"{time.time()}_{mac}"
+                    hash = hashlib.sha256(data.encode()).hexdigest()
+                    filename = hash + '.pt'
+                    torch.save(model.state_dict(), filename)
+                    s3.upload_file(filename, bucket_name, filename)
 
-                    message_handler.send_message({'client_id': id, 'params': params})
+                    message_handler.send_message({'client_id': id, 'params': filename})
+                    os.remove(params)
 
         except Exception as e:
             print(e)

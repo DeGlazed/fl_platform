@@ -31,6 +31,18 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
+# Configure LocalStack
+os.environ['AWS_ACCESS_KEY_ID'] = 'test'
+os.environ['AWS_SECRET_ACCESS_KEY'] = 'test'
+os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
+localstack_endpoint = 'http://localhost:4566'
+
+# Create S3 client
+s3 = boto3.client('s3', endpoint_url=localstack_endpoint)
+
+# Create a bucket
+bucket_name = 'your-bucket'
+
 parser = argparse.ArgumentParser(description='Server for federated learning platform.')
 parser.add_argument("--min_cli", type=int, required=True, help="Min Number Of Clients")
 args = parser.parse_args()
@@ -40,7 +52,11 @@ client_manager = ClientManager()
 strategy = FedFA(client_manager, MIN_CLIENTS)
 
 model = Net()
-init_params = [val.cpu().numpy().tolist() for _, val in model.state_dict().items()]
+
+# init_params = [val.cpu().numpy().tolist() for _, val in model.state_dict().items()]
+
+init_params_filename = 'init_params.pth'
+torch.save(model.state_dict(), init_params_filename)
 
 def startClientHandler(message_handler) :
     while True:
@@ -68,14 +84,15 @@ def startFLStrategy(message_handler, min_clinets_connected) :
     print(f"Sending initial params to {min_clinets_connected} clients...")
     initial_population = strategy.get_initial_situation()
 
+    s3.upload_file(init_params_filename, bucket_name, init_params_filename)
     for client_id in initial_population:
-        print(f"Sending initial params to client {client_id}...")\
+        print(f"Sending initial params to client {client_id}...")
+        s3.upload_file(init_params_filename, bucket_name, init_params_filename)
 
-        # response_size = len(json.dumps(response).encode('utf-8')) / (1024 * 1024)
-        # print(f"Response size: {response_size:.2f} MB")
-
-        message_handler.send_message({'client_id': client_id, 'params': init_params})
+        message_handler.send_message({'client_id': client_id, 'params': init_params_filename})
         client_manager.set_client_state(client_id, ClientState.BUSY)
+
+    os.remove(init_params_filename)
 
     #Handle client responses
     while True:
@@ -84,10 +101,15 @@ def startFLStrategy(message_handler, min_clinets_connected) :
         results = message_handler.consume_local_model_message(1000)
         if results: 
             for client_id, msg in results:
-                params = msg.value.get('params')
+                filename = msg.value.get('params')
                 print(f"Received local params from client {client_id}")
 
                 client_manager.set_client_state(client_id, ClientState.FINISHED)
+
+                s3.download_file(bucket_name, filename, filename)
+                model.load_state_dict(torch.load(filename))
+                params = [val.cpu().numpy().tolist() for _, val in model.state_dict().items()]
+                os.remove(filename)
 
                 params_dict = zip(model.state_dict().keys(), params)
                 state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
@@ -95,17 +117,25 @@ def startFLStrategy(message_handler, min_clinets_connected) :
                 print(f"Processing params of {client_id}...")
                 
                 new_client_id, new_global_dict = strategy.agregate(state_dict)
+
                 if(new_client_id):
                     print(f"Sending global params to client {new_client_id}...")
 
-                    params = [val.cpu().numpy().tolist() for _, val in new_global_dict.items()]
+                    mac = uuid.getnode()
+                    data = f"{time.time()}_{mac}"
+                    hash = hashlib.sha256(data.encode()).hexdigest()
+                    filename = hash + '.pt'
+                    torch.save(new_global_dict, filename)
+                    s3.upload_file(filename, bucket_name, filename)
 
-                    message_handler.send_message({'client_id': new_client_id, 'params': params})
+                    message_handler.send_message({'client_id': new_client_id, 'params': filename})
                     client_manager.set_client_state(new_client_id, ClientState.BUSY)
+                    os.remove(filename)
 
                 print(f"Finished processing params of {client_id}")
 
                 client_manager.set_client_state(client_id, ClientState.READY)      
+
         time.sleep(2)
 
 if __name__ == '__main__':
