@@ -13,11 +13,6 @@ from model import Net
 
 from fl_platform.src.utils.message_utils import ServerSimpleMessageHandler
 
-import hashlib
-import uuid
-import os
-import boto3
-
 local_models_consumer = KafkaConsumer(
     'local-models',
     bootstrap_servers='localhost:29092',
