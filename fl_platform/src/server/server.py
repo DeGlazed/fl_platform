@@ -4,11 +4,14 @@ import logging
 import traceback
 import random
 import boto3
+from fl_platform.src.utils.client_manager import ClientManager
+from fl_platform.src.strategy.strategy import AbstractStrategy
+from fl_platform.src.utils.message_utils import ServerSimpleMessageHandler
 
 class SimpleServer:
-
     def __init__(self, 
                 min_clients : int,
+                strategy : AbstractStrategy,
                 kafka_server : str,
                 client_logs_topic : str = None,
                 local_models_topic : str = None,
@@ -21,7 +24,9 @@ class SimpleServer:
                 ):
         logging.basicConfig(level=logging.INFO)
         self.min_clients = min_clients
+        self.strategy = strategy
         self.kafka_server = kafka_server
+
         self.client_logs_topic = client_logs_topic
         self.local_models_topic = local_models_topic
         self.global_models_topic = global_models_topic
@@ -31,16 +36,52 @@ class SimpleServer:
         self.localstack_secret_access_key = localstack_secret_access_key
         self.localstack_region_name = localstack_region_name
 
+        if(self.localstack_server) :
+            #TODO change this when we have s3 message implementation
+            self.message_handler = ServerSimpleMessageHandler(
+                self.kafka_server,
+                self.global_models_topic,
+                self.local_models_topic,
+                self.client_logs_topic
+            )
+        else :
+            self.message_handler = ServerSimpleMessageHandler(
+                self.kafka_server,
+                self.global_models_topic,
+                self.local_models_topic,
+                self.client_logs_topic
+            )
+        self.client_manager = ClientManager()
+
     def start_server(self):
+        setup_server_successful = self.setup_server()
+        if not setup_server_successful:
+            logging.error("Server setup failed. Exiting...")
+            return
+        
+        logging.info("Server setup completed successfully.")
+        logging.info("Starting server...")
+
+    def setup_server(self) -> bool:
+        can_start_server = True
+        
         kafka_setup_successful = self.setup_kafka()
+        
+        can_start_server = can_start_server and kafka_setup_successful
+
         if kafka_setup_successful is True:
             logging.info("Kafka setup completed successfully.")
         
         if(self.localstack_server):
             logging.info("Localstack server address provided, setting up...")
             localstack_setup_successful = self.setup_localstack()
+
+            can_start_server = can_start_server and localstack_setup_successful
+
             if localstack_setup_successful is True:
                 logging.info("Localstack setup completed successfully.")
+
+        return can_start_server
             
     def setup_kafka(self) -> bool:
         admin_client = None

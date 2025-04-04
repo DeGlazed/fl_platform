@@ -1,14 +1,16 @@
 from fl_platform.src.utils.client_manager import ClientManager
+from .strategy import AbstractStrategy
 from typing import List, OrderedDict, Tuple
 import os
 import torch
 
 #Source : FEDFA: A fully asynchronous training paradigm for federated learning. (n.d.). https://arxiv.org/html/2404.11015v2
-class FedFA() :
+class FedFA(AbstractStrategy) :
     def __init__(self, 
                  client_manager: ClientManager, 
                  k: int
                  ) :
+        super.__init__()
         self.k = k
         self.client_manager = client_manager
         self.queue = []

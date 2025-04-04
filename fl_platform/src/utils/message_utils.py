@@ -1,6 +1,10 @@
 from kafka import KafkaProducer, KafkaConsumer
 import json
 
+class Message():
+    def __init__(self) :
+        pass
+
 class ClientSimpleMessageHandler():
     def __init__(self, kafka_bootstrap_servers, client_id, global_model_topic, local_model_topic, client_logs_topic):
         self.client_id = client_id
