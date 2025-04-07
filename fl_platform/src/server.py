@@ -4,20 +4,26 @@ import logging
 import traceback
 import random
 import boto3
-from fl_platform.src.utils.client_manager import ClientManager
-from fl_platform.src.strategy.strategy import AbstractStrategy
-from fl_platform.src.utils.message_utils import ServerSimpleMessageHandler
+import time
+import threading
+from .utils.client_manager import ClientManager
+from .strategy.strategy import AbstractStrategy
+from .utils.message_utils import SimpleMessageConsumer, MessageType
 
 class SimpleServer:
     def __init__(self, 
                 min_clients : int,
                 strategy : AbstractStrategy,
+                initial_params : list,
                 kafka_server : str,
+
                 client_logs_topic : str = None,
                 local_models_topic : str = None,
                 global_models_topic : str = None,
+
                 localstack_server : str = None,
                 localstack_bucket : str = None,
+
                 localstack_access_key_id : str = "test",
                 localstack_secret_access_key : str = "test",
                 localstack_region_name : str = 'us-east-1'
@@ -25,6 +31,7 @@ class SimpleServer:
         logging.basicConfig(level=logging.INFO)
         self.min_clients = min_clients
         self.strategy = strategy
+        self.initial_params = initial_params
         self.kafka_server = kafka_server
 
         self.client_logs_topic = client_logs_topic
@@ -36,22 +43,8 @@ class SimpleServer:
         self.localstack_secret_access_key = localstack_secret_access_key
         self.localstack_region_name = localstack_region_name
 
-        if(self.localstack_server) :
-            #TODO change this when we have s3 message implementation
-            self.message_handler = ServerSimpleMessageHandler(
-                self.kafka_server,
-                self.global_models_topic,
-                self.local_models_topic,
-                self.client_logs_topic
-            )
-        else :
-            self.message_handler = ServerSimpleMessageHandler(
-                self.kafka_server,
-                self.global_models_topic,
-                self.local_models_topic,
-                self.client_logs_topic
-            )
         self.client_manager = ClientManager()
+        self.server_stop = False
 
     def start_server(self):
         setup_server_successful = self.setup_server()
@@ -61,6 +54,17 @@ class SimpleServer:
         
         logging.info("Server setup completed successfully.")
         logging.info("Starting server...")
+
+        client_handler_thread = threading.Thread(target=self.startClientHandler, args=(), daemon=True)
+        client_handler_thread.start()
+
+
+        while not self.server_stop:
+            while len(self.client_manager.get_all_clients()) < self.min_clients:
+                logging.info(f"Waiting for {self.min_clients - len(self.client_manager.get_all_clients())} more clients to connect...")
+                time.sleep(1)
+        
+
 
     def setup_server(self) -> bool:
         can_start_server = True
@@ -143,3 +147,20 @@ class SimpleServer:
             if s3_client:
                 s3_client.close()
         return True
+    
+    def startClientHandler(self) :
+        message_consumer = SimpleMessageConsumer(self.kafka_server, self.client_logs_topic)
+        while True:
+            results = message_consumer.consume_message(1000)
+            if(results):
+                for entry in results :
+                    message_type = entry.value.get('header').get('type')
+                    client_id = entry.value.get('header').get('cid')
+                    if(message_type == MessageType.CONNECT) :
+                        logging.info(f"Client {client_id} connected.")
+                        self.client_manager.add_client(client_id)
+                    elif(message_type == MessageType.DISCONNECT) :
+                        logging.info(f"Client {client_id} disconnected.")
+                        self.client_manager.remove_client(client_id)
+            print(self.client_manager.get_all_clients())
+            time.sleep(1)

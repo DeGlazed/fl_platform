@@ -33,6 +33,12 @@ class ClientManager() :
         self.client_state[client_id] = state
         self.client_state_lock.release()
 
+    def get_all_clients(self) :
+        self.client_state_lock.acquire()
+        all_clients = list(self.client_state.keys())
+        self.client_state_lock.release()
+        return all_clients
+
     def get_all_ready_clients(self) :
         self.client_state_lock.acquire()
         ready_clients = [cid for cid, state in self.client_state.items() if state == ClientState.READY]

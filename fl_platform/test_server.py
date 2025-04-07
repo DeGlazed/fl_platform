@@ -1,9 +1,11 @@
-from src.server.server import SimpleServer
+from src.server import SimpleServer
+from src.strategy.fed_fa import FedFA
 import unittest
 from kafka.admin import KafkaAdminClient
 import boto3
 
 class TestSimpleServer(unittest.TestCase):
+    strategy = FedFA()
 
     def test_setup_kafka_unreachable_host(self):
         server = SimpleServer(
