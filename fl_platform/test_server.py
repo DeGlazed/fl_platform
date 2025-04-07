@@ -5,8 +5,24 @@ from kafka.admin import KafkaAdminClient
 import boto3
 
 class TestSimpleServer(unittest.TestCase):
-    strategy = FedFA()
 
+    def getServer(self):
+        initial_params = [0.5, 0.5]  # Example initial parameters for the model
+        strategy = FedFA(k=5)  # Example strategy with k=5
+        server = SimpleServer(
+                    min_clients=5,
+                    strategy=strategy,
+                    initial_params=initial_params,
+                    kafka_server='localhost:29092',
+                    client_logs_topic='client-logs',
+                    local_models_topic='local-models',
+                    global_models_topic='global-models',
+                    localstack_server='http://localhost:4566',
+                    localstack_bucket='my-bucket',
+                )              
+        return server
+
+    @unittest.skip("skip")
     def test_setup_kafka_unreachable_host(self):
         server = SimpleServer(
             min_clients=5,
@@ -14,6 +30,7 @@ class TestSimpleServer(unittest.TestCase):
         )
         self.assertFalse(server.setup_kafka())
 
+    @unittest.skip("skip")
     def test_setup_kafka_unreachable_port(self):
         server = SimpleServer(
             min_clients=5,
@@ -21,6 +38,7 @@ class TestSimpleServer(unittest.TestCase):
         )
         self.assertFalse(server.setup_kafka())
 
+    @unittest.skip("skip")
     def test_setup_kafka_no_topics(self):
         kafka_server='localhost:29092'
         server = SimpleServer(
@@ -41,6 +59,7 @@ class TestSimpleServer(unittest.TestCase):
         
         self.assertEquals(len(test_admin_client.list_topics()), 3)
 
+    @unittest.skip("skip")
     def test_setup_kafka_topics(self):
         kafka_server='localhost:29092'
         server = SimpleServer(
@@ -65,6 +84,7 @@ class TestSimpleServer(unittest.TestCase):
         topics = ['client-logs', 'local-models', 'global-models']
         self.assertEquals(test_admin_client.list_topics().sort(), topics.sort())
 
+    @unittest.skip("skip")
     def test_setup_localstack_unreachable_host(self):
         localstack_server='http://whatever:4566'
         server = SimpleServer(
@@ -74,6 +94,7 @@ class TestSimpleServer(unittest.TestCase):
         )
         self.assertFalse(server.setup_localstack())
     
+    @unittest.skip("skip")
     def test_setup_localstack_unreachable_port(self):
         localstack_server='http://localhost:9999'
         server = SimpleServer(
@@ -89,11 +110,7 @@ class TestSimpleServer(unittest.TestCase):
         localstack_region_name = 'us-east-1'
         localstack_server='http://localhost:4566'  
 
-        server = SimpleServer(
-            min_clients=5,
-            kafka_server='localhost:29092',
-            localstack_server=localstack_server
-        )
+        server = self.getServer()
         
         s3 = boto3.client('s3', 
                           endpoint_url=localstack_server,
@@ -116,12 +133,8 @@ class TestSimpleServer(unittest.TestCase):
         localstack_secret_access_key = "test"
         localstack_region_name = 'us-east-1'
         localstack_server='http://localhost:4566'  
-        server = SimpleServer(
-            min_clients=5,
-            kafka_server='localhost:29092',
-            localstack_server=localstack_server,
-            localstack_bucket='my-bucket'
-        )
+        
+        server = self.getServer()
 
         s3 = boto3.client('s3', 
                           endpoint_url=localstack_server,

@@ -34,7 +34,7 @@ class SimpleMessageConsumer():
             value_deserializer=lambda x: json.loads(x.decode('utf-8'))
         )
 
-    def consume_message(self, timeout_ms : int) -> List:
+    def consume_message(self, timeout_ms : int) -> str:
         state = self.consumer.poll(timeout_ms=timeout_ms)
         result = []
         if state:

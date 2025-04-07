@@ -17,12 +17,12 @@ class SimpleServer:
                 initial_params : list,
                 kafka_server : str,
 
+                localstack_server : str,
+                localstack_bucket : str,
+                
                 client_logs_topic : str = None,
                 local_models_topic : str = None,
                 global_models_topic : str = None,
-
-                localstack_server : str = None,
-                localstack_bucket : str = None,
 
                 localstack_access_key_id : str = "test",
                 localstack_secret_access_key : str = "test",
@@ -76,14 +76,12 @@ class SimpleServer:
         if kafka_setup_successful is True:
             logging.info("Kafka setup completed successfully.")
         
-        if(self.localstack_server):
-            logging.info("Localstack server address provided, setting up...")
-            localstack_setup_successful = self.setup_localstack()
+        localstack_setup_successful = self.setup_localstack()
 
-            can_start_server = can_start_server and localstack_setup_successful
+        can_start_server = can_start_server and localstack_setup_successful
 
-            if localstack_setup_successful is True:
-                logging.info("Localstack setup completed successfully.")
+        if localstack_setup_successful is True:
+            logging.info("Localstack setup completed successfully.")
 
         return can_start_server
             

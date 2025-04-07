@@ -1,4 +1,3 @@
-from fl_platform.src.utils.client_manager import ClientManager
 from .strategy import AbstractStrategy
 from typing import List
 import numpy as np

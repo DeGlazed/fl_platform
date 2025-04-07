@@ -13,7 +13,9 @@ server = SimpleServer(
     kafka_server='localhost:29092',
     client_logs_topic='client-logs',
     local_models_topic='local-models',
-    global_models_topic='global-models'
+    global_models_topic='global-models',
+    localstack_server='http://localhost:4566',
+    localstack_bucket='mybucket',
 )
 
 server.start_server()

@@ -14,8 +14,8 @@ class SimpleClient:
                 local_models_topic: str,
                 global_models_topic: str,
 
-                localstack_server: str = None,
-                localstack_bucket: str = None,
+                localstack_server: str,
+                localstack_bucket: str,
                 localstack_access_key_id: str = "test",
                 localstack_secret_access_key: str = "test",
                 localstack_region_name: str = 'us-east-1'
