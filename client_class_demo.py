@@ -13,6 +13,13 @@ client = SimpleClient(
     localstack_bucket='mybucket',
 )
 
-time.sleep(10)
+while True:
+    new_model = client.get_new_task()
+    if new_model:
+        print(new_model)
+        #Do training here
+
+    client.publish_updated_model(new_model)
+    time.sleep(10)
 
 client.close()

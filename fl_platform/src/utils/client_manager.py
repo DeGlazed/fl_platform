@@ -3,6 +3,7 @@ import threading
 import random
 
 class ClientState(Enum) :
+    CONNECTED = 0
     READY = 1
     BUSY = 2
     FINISHED = 3
@@ -13,9 +14,8 @@ class ClientManager() :
         self.client_state_lock = threading.Lock()
 
     def add_client(self, client_id) :
-        self.client_state_lock.acquire()
-        self.client_state[client_id] = ClientState.READY
-        self.client_state_lock.release()
+        if client_id not in self.client_state.keys() :
+            self.set_connected(client_id)
 
     def remove_client(self, client_id) :
         self.client_state_lock.acquire()
@@ -32,6 +32,18 @@ class ClientManager() :
         self.client_state_lock.acquire()
         self.client_state[client_id] = state
         self.client_state_lock.release()
+    
+    def set_connected(self, client_id) :
+        self.set_client_state(client_id, ClientState.CONNECTED)
+    
+    def set_busy(self, client_id) :
+        self.set_client_state(client_id, ClientState.BUSY)
+    
+    def set_ready(self, client_id) :
+        self.set_client_state(client_id, ClientState.READY)
+    
+    def set_finished(self, client_id) :
+        self.set_client_state(client_id, ClientState.FINISHED)
 
     def get_all_clients(self) :
         self.client_state_lock.acquire()
@@ -53,4 +65,5 @@ class ClientManager() :
             self.client_state_lock.release()
             return random_clients
         else:
+            self.client_state_lock.release()
             return None

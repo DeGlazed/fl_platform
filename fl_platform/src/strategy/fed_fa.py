@@ -41,4 +41,4 @@ class FedFA(AbstractStrategy) :
         # file_path = os.path.join(save_dir, f"model_{index}.pth")
         # torch.save(new_global_model, file_path)
         
-        return new_global_model
+        return 1, new_global_model
