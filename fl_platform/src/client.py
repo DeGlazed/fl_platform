@@ -7,6 +7,7 @@ from .utils.message_utils import SimpleMessageProducer, SimpleMessageConsumer, M
 import torch
 import boto3
 import os
+import numpy as np
 
 class State() :
     CONECTED = 0
@@ -30,7 +31,7 @@ class SimpleClient:
                 localstack_region_name: str = 'us-east-1'
                 ):
         
-
+        logging.basicConfig(level=logging.INFO)
         self.model = model
         self.kafka_server = kafka_server
         self.client_logs_topic = client_logs_topic
@@ -49,6 +50,7 @@ class SimpleClient:
         mac = uuid.getnode()
         data = f"{time.time()}_{mac}"
         self.cid = hashlib.sha256(data.encode()).hexdigest()
+        logging.info(f"Client ID: {self.cid}")
 
         init_state_dict = self.model.state_dict()
 
@@ -81,7 +83,7 @@ class SimpleClient:
             payload=f"init_{self.cid}.pth"
         )
 
-        print(f"Client {self.cid} started")
+        logging.info(f"Client {self.cid} started")
         self.client_logs_producer.send_message(connect_message)
         os.remove(f"init_{self.cid}.pth")
 
@@ -117,7 +119,13 @@ class SimpleClient:
                 params_file,
                 params_file
             )
+
+            # Convert numpy arrays to torch tensors
             state_dict = torch.load(params_file)
+            for key, value in state_dict.items():
+                if isinstance(value, np.ndarray):
+                    state_dict[key] = torch.tensor(value)
+
             if not isinstance(state_dict, dict):
                 raise ValueError("The loaded state_dict is not a dictionary.")
             self.model.load_state_dict(state_dict, strict=True)
@@ -126,22 +134,26 @@ class SimpleClient:
 
 
     def publish_updated_model(self, 
-                              model: nn.Module):
+                              model: nn.Module,
+                              training_info: dict = None):
         state_dict = model.state_dict()
-        torch.save(state_dict, f"local_{self.cid}_{int(time.time())}.pth")
+        
+        file_name = f"local_{self.cid}_{int(time.time())}.pth"
+        torch.save(state_dict, file_name)
         
         self.s3_client.upload_file(
-            f"local_{self.cid}_{int(time.time())}.pth",
+            file_name,
             self.localstack_bucket,
-            f"local_{self.cid}_{int(time.time())}.pth"
+            file_name
         )
-        os.remove(f"local_{self.cid}_{int(time.time())}.pth")
+        os.remove(file_name)
 
         result_message = Message(
                 cid=self.cid,
                 type=MessageType.TASK,
                 timestamp=str(time.time()),
-                payload=f"local_{self.cid}_{int(time.time())}.pth"
+                payload=file_name,
+                training_info=training_info
             )
         self.result_producer.send_message(result_message)
         self.client_state = State.FINISHED
@@ -154,5 +166,5 @@ class SimpleClient:
             payload=None
         )
 
-        print(f"Client {self.cid} disconnected")
+        logging.debug(f"Client {self.cid} disconnected")
         self.client_logs_producer.send_message(connect_message)

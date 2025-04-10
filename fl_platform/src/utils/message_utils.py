@@ -13,13 +13,15 @@ class Message():
                  cid : str,
                  type : int,
                  timestamp : str,
-                 payload : List = None) :
+                 payload : str = None,
+                 training_info : dict = None) :
         self.message = {"header": {
                             "cid": cid,
                             "type": type,
                             "timestamp": timestamp,
                         },
-                        "payload": payload}
+                        "payload": payload,
+                        "training_info": training_info}
 
     def get_message(self) -> Dict[str, Any]:
         return self.message

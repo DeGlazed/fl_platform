@@ -30,6 +30,20 @@ class Net(nn.Module):
         x = self.fc2(x)
         return x
     
+class MiniNet(nn.Module):
+
+    def __init__(self):
+        super(MiniNet, self).__init__()
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
+        self.fc1 = nn.Linear(14*14*16, 10)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2)
+        x = x.view(x.size(0), -1)
+        x = self.fc1(x)
+        return x
+    
 def train(net, trainloader, valloader, epochs, device = DEVICE):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available

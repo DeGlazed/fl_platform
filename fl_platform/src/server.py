@@ -1,5 +1,4 @@
 from kafka.admin import KafkaAdminClient, NewTopic
-import torch.nn as nn
 import logging
 import traceback
 import random
@@ -93,6 +92,7 @@ class SimpleServer:
                     raise ValueError("No initial parameters available to sample from.")
                 
                 sampled_params = random.choice(self.initial_params)
+                logging.debug(f"Sampling initial parameters. Choice is {sampled_params}...")
                 torch.save(sampled_params, 'snapshot_0.params')
 
                 self.s3_client.upload_file(
@@ -103,7 +103,7 @@ class SimpleServer:
                 os.remove('snapshot_0.params')
 
                 for client_id in clinet_ids:
-                    logging.info(f"Sending initial parameters to client {client_id}...")
+                    logging.debug(f"Sending initial parameters to client {client_id}...")
                     task_message = Message(
                                             cid=client_id,
                                             type=MessageType.TASK,
@@ -114,6 +114,7 @@ class SimpleServer:
                     self.client_manager.set_busy(client_id)
 
                 just_started = False
+
             else:
                 logging.info(f"Server is running with {len(self.client_manager.get_all_clients())} clients.")
                 result = self.local_consumer.consume_message(1000)
@@ -121,6 +122,7 @@ class SimpleServer:
                 if result:
                     for msg in result:
                         client_id = msg.value.get('header').get('cid')
+                        training_info = msg.value.get('training_info')
                         params_file = msg.value.get('payload')
                         self.s3_client.download_file(self.localstack_bucket, params_file, params_file)
                         state_dict = torch.load(params_file)
@@ -129,9 +131,9 @@ class SimpleServer:
                         os.remove(params_file)
 
                         logging.info(f"Received local parameters from client {client_id}.")
+                        number_of_next_samples, new_global_state_dict = self.strategy.aggregate(state_dict, training_info)
+                        print(number_of_next_samples)
                         self.client_manager.set_finished(client_id)
-                        
-                        number_of_next_samples, new_global_state_dict = self.strategy.aggregate(state_dict)
                         
                         if number_of_next_samples is not None:
                             self.client_pool += number_of_next_samples
@@ -148,14 +150,15 @@ class SimpleServer:
                                     selected_ready_clients = self.client_manager.sample_ready_clients(self.client_pool)
                                     self.client_pool = 0
 
+                                torch.save(self.current_global_state_dict, f'snapshot_{self.snapshot}.params')
                                 self.s3_client.upload_file(
                                     f'snapshot_{self.snapshot}.params',
-                                    self.current_global_state_dict,
+                                    self.localstack_bucket,
                                     f'snapshot_{self.snapshot}.params'
                                 )
+                                os.remove(f'snapshot_{self.snapshot}.params')
 
                                 for client in selected_ready_clients:
-                                    
                                     logging.info(f"Sending global parameters to client {client}...")
                                     task_message = Message(
                                         cid=client,
@@ -166,12 +169,8 @@ class SimpleServer:
                                     self.task_producer.send_message(task_message)
                                     self.client_manager.set_busy(client)
 
-                                os.remove(f'snapshot_{self.snapshot}.params')
                                 self.snapshot += 1
                 time.sleep(5)
-
-        
-
 
     def setup_server(self) -> bool:
         can_start_server = True
@@ -212,10 +211,10 @@ class SimpleServer:
             new_topics = [NewTopic(name=topic, num_partitions=1, replication_factor=1) for topic in topics if topic not in existing_topics]
             if new_topics:
                 admin_client.create_topics(new_topics)
-                logging.info(f"Created topics: {[topic.name for topic in new_topics]}")
-                logging.info(f"Using topics: {topics}")
+                logging.debug(f"Created topics: {[topic.name for topic in new_topics]}")
+                logging.debug(f"Using topics: {topics}")
             else:
-                logging.info("No new topics to create.")
+                logging.debug("No new topics to create.")
         except Exception as e:
             logging.error(f"Error setting up Kafka: {e}")
             traceback.print_exc()
@@ -234,13 +233,13 @@ class SimpleServer:
                 aws_secret_access_key=self.localstack_secret_access_key,
                 region_name=self.localstack_region_name)
             
-            logging.info(f"Connected to Localstack S3 at {self.localstack_server}")
+            logging.debug(f"Connected to Localstack S3 at {self.localstack_server}")
 
             if not self.localstack_bucket:
                 self.localstack_bucket = 'bucket'+'-'+str(random.randint(0, 10000))
             
             self.s3_client.create_bucket(Bucket=self.localstack_bucket)
-            logging.info(f"Bucket '{self.localstack_bucket}' created.")
+            logging.debug(f"Bucket '{self.localstack_bucket}' created.")
 
         except Exception as e:
             logging.error(f"Error connecting to Localstack: {e}")
@@ -282,14 +281,12 @@ class SimpleServer:
                         waiting_clients_to_be_ready.append(client_id)
 
                     elif(message_type == MessageType.DISCONNECT) :
-                        logging.info(f"Client {client_id} disconnected.")
+                        logging.debug(f"Client {client_id} disconnected.")
                         self.client_manager.remove_client(client_id)
-
-            print(self.client_manager.get_all_ready_clients())
 
             for client_id in waiting_clients_to_be_ready:
                 if self.client_manager.get_client_state(client_id) == ClientState.CONNECTED or self.client_manager.get_client_state(client_id) == ClientState.FINISHED:
-                    logging.info(f"Client {client_id} is ready for new task.")
+                    logging.debug(f"Client {client_id} is ready for new task.")
                     self.client_manager.set_ready(client_id)
                     waiting_clients_to_be_ready.remove(client_id)
             time.sleep(1)
