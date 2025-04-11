@@ -12,6 +12,8 @@ server = SimpleServer(
     client_logs_topic='client-logs',
     local_models_topic='local-models',
     global_models_topic='global-models',
+    client_heartbeat_topic='client-heartbeat',
+    server_heartbeat_topic='server-heartbeat',
     localstack_server='http://localhost:4566',
     localstack_bucket='mybucket',
 )

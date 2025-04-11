@@ -25,10 +25,14 @@ class SimpleServer:
                 local_models_topic : str = None,
                 global_models_topic : str = None,
 
+                client_heartbeat_topic : str = None,
+                server_heartbeat_topic : str = None,
+
                 localstack_access_key_id : str = "test",
                 localstack_secret_access_key : str = "test",
                 localstack_region_name : str = 'us-east-1'
                 ):
+        
         logging.basicConfig(level=logging.INFO)
         self.min_clients = min_clients
         self.strategy = strategy
@@ -38,6 +42,10 @@ class SimpleServer:
         self.client_logs_topic = client_logs_topic
         self.local_models_topic = local_models_topic
         self.global_models_topic = global_models_topic
+
+        self.client_heartbeat_topic = client_heartbeat_topic
+        self.server_heartbeat_topic = server_heartbeat_topic
+
         self.localstack_server = localstack_server
         self.localstack_bucket = localstack_bucket
         self.localstack_access_key_id = localstack_access_key_id
@@ -47,7 +55,7 @@ class SimpleServer:
         self.s3_client = None
 
         self.client_manager = ClientManager()
-        self.server_stop = False
+        self.server_stop = threading.Event()
 
         self.client_pool = 0
         self.current_global_state_dict = None
@@ -75,9 +83,18 @@ class SimpleServer:
         client_handler_thread = threading.Thread(target=self.startClientHandler, args=(), daemon=True)
         client_handler_thread.start()
 
+        heartbeat_monitor_thread = threading.Thread(target=self.heartbeat_monitor, args=(), daemon=True)
+        heartbeat_monitor_thread.start()
+       
+        heartbeat_listener_thread = threading.Thread(target=self.start_heartbeat_listener, args=(), daemon=True)
+        heartbeat_listener_thread.start()
+
+        heartbeat_producer_thread = threading.Thread(target=self.start_heartbeat_producer, args=(), daemon=True)
+        heartbeat_producer_thread.start()
+
+
         just_started = True
-        while not self.server_stop:
-            
+        while not self.server_stop.is_set():
             if just_started:
                 while len(self.client_manager.get_all_ready_clients()) < self.min_clients:
                     logging.info(f"Waiting for {self.min_clients - len(self.client_manager.get_all_ready_clients())} more clients to be ready...")
@@ -116,6 +133,13 @@ class SimpleServer:
                 just_started = False
 
             else:
+                
+                #Check stopping condition
+                if len(self.client_manager.get_all_clients()) < self.min_clients:
+                    logging.warning(f"Less than {self.min_clients} clients connected. Stopping server.")
+                    self.server_stop.set()
+                    break
+
                 logging.info(f"Server is running with {len(self.client_manager.get_all_clients())} clients.")
                 result = self.local_consumer.consume_message(1000)
                 
@@ -130,9 +154,13 @@ class SimpleServer:
                             raise ValueError("The loaded state_dict is not an OrderedDict.")
                         os.remove(params_file)
 
+                        # Convert state_dict tensors from CUDA to numpy (xpu)
+                        for key, value in state_dict.items():
+                            if value.is_cuda:
+                                state_dict[key] = value.cpu().numpy()
+
                         logging.info(f"Received local parameters from client {client_id}.")
                         number_of_next_samples, new_global_state_dict = self.strategy.aggregate(state_dict, training_info)
-                        print(number_of_next_samples)
                         self.client_manager.set_finished(client_id)
                         
                         if number_of_next_samples is not None:
@@ -171,6 +199,17 @@ class SimpleServer:
 
                                 self.snapshot += 1
                 time.sleep(5)
+        
+        logging.info("Server stopped.")
+        for client in self.client_manager.get_all_clients():
+            logging.info(f"Sending disconnect message to client {client}...")
+            disconnect_message = Message(
+                cid=client,
+                type=MessageType.DISCONNECT,
+                timestamp=str(time.time()),
+                payload=None
+            )
+            self.task_producer.send_message(disconnect_message)
 
     def setup_server(self) -> bool:
         can_start_server = True
@@ -205,14 +244,18 @@ class SimpleServer:
                 self.local_models_topic = 'local-models'+'-'+str(random.randint(0, 10000))
             if not self.global_models_topic :
                 self.global_models_topic = 'global-models'+'-'+str(random.randint(0, 10000))
-            
-            topics = [self.client_logs_topic, self.local_models_topic, self.global_models_topic]
+            if not self.client_heartbeat_topic :
+                self.client_heartbeat_topic = 'client-heartbeat'+'-'+str(random.randint(0, 10000))
+            if not self.server_heartbeat_topic :
+                self.server_heartbeat_topic = 'server-heartbeat'+'-'+str(random.randint(0, 10000))
+
+            topics = [self.client_logs_topic, self.local_models_topic, self.global_models_topic, self.client_heartbeat_topic, self.server_heartbeat_topic]
             existing_topics = admin_client.list_topics()
             new_topics = [NewTopic(name=topic, num_partitions=1, replication_factor=1) for topic in topics if topic not in existing_topics]
             if new_topics:
                 admin_client.create_topics(new_topics)
                 logging.debug(f"Created topics: {[topic.name for topic in new_topics]}")
-                logging.debug(f"Using topics: {topics}")
+                logging.info(f"Using topics: {topics}")
             else:
                 logging.debug("No new topics to create.")
         except Exception as e:
@@ -290,3 +333,45 @@ class SimpleServer:
                     self.client_manager.set_ready(client_id)
                     waiting_clients_to_be_ready.remove(client_id)
             time.sleep(1)
+
+    def start_heartbeat_listener(self):
+        heartbeat_consumer = SimpleMessageConsumer(
+            self.kafka_server,
+            self.client_heartbeat_topic
+        )
+
+        while not self.server_stop.is_set():
+            heartbeat_message = heartbeat_consumer.consume_message(1000)
+            if heartbeat_message:
+                for msg in heartbeat_message:
+                    client_id = msg.value.get('header').get('cid')
+                    if client_id in self.client_manager.get_all_clients():
+                        self.client_manager.update_client_last_seen(client_id)
+                        logging.info(f"Received heartbeat from client {client_id}.")
+                    else:
+                        logging.warning(f"Received heartbeat from unknown client {client_id}.")
+
+    def start_heartbeat_producer(self):
+        heartbeat_producer = SimpleMessageProducer(
+            self.kafka_server,
+            self.server_heartbeat_topic
+        )
+
+        while not self.server_stop.is_set():
+            heartbeat_message = Message(
+                    cid=None,
+                    type=MessageType.HEARTBEAT,
+                    timestamp=None,
+                    payload=None
+                )
+            heartbeat_producer.send_message(heartbeat_message)
+            time.sleep(2)
+    
+    def heartbeat_monitor(self):
+        while not self.server_stop.is_set():
+            for client_id in self.client_manager.get_all_clients():
+                last_seen = self.client_manager.get_client_last_seen(client_id)
+                if time.time() - last_seen > 10:
+                    logging.warning(f"Client {client_id} has not sent a heartbeat in a while. Last seen at {last_seen}.")
+                    self.client_manager.remove_client(client_id)
+            time.sleep(2)

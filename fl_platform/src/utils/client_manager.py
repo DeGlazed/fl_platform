@@ -1,6 +1,7 @@
 from enum import Enum
 import threading
 import random
+import time
 
 class ClientState(Enum) :
     CONNECTED = 0
@@ -11,6 +12,7 @@ class ClientState(Enum) :
 class ClientManager() :
     def __init__(self) :
         self.client_state = {}
+        self.client_last_seen = {}
         self.client_state_lock = threading.Lock()
 
     def add_client(self, client_id) :
@@ -31,7 +33,20 @@ class ClientManager() :
     def set_client_state(self, client_id, state) :
         self.client_state_lock.acquire()
         self.client_state[client_id] = state
+        if(state == ClientState.CONNECTED) :
+            self.client_last_seen[client_id] = time.time()
         self.client_state_lock.release()
+    
+    def update_client_last_seen(self, client_id) :
+        self.client_state_lock.acquire()
+        self.client_last_seen[client_id] = time.time()
+        self.client_state_lock.release()
+    
+    def get_client_last_seen(self, client_id) :
+        self.client_state_lock.acquire()
+        last_seen = self.client_last_seen.get(client_id)
+        self.client_state_lock.release()
+        return last_seen
     
     def set_connected(self, client_id) :
         self.set_client_state(client_id, ClientState.CONNECTED)

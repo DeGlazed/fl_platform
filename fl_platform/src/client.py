@@ -8,6 +8,7 @@ import torch
 import boto3
 import os
 import numpy as np
+import threading
 
 class State() :
     CONECTED = 0
@@ -24,6 +25,9 @@ class SimpleClient:
                 local_models_topic: str,
                 global_models_topic: str,
 
+                client_heartbeat_topic : str,
+                server_heartbeat_topic : str,
+
                 localstack_server: str,
                 localstack_bucket: str,
                 localstack_access_key_id: str = "test",
@@ -37,6 +41,10 @@ class SimpleClient:
         self.client_logs_topic = client_logs_topic
         self.local_models_topic = local_models_topic
         self.global_models_topic = global_models_topic
+
+        self.client_heartbeat_topic = client_heartbeat_topic
+        self.server_heartbeat_topic = server_heartbeat_topic
+
         self.localstack_server = localstack_server
         self.localstack_bucket = localstack_bucket
         self.localstack_access_key_id = localstack_access_key_id
@@ -97,8 +105,20 @@ class SimpleClient:
             self.local_models_topic
         )
 
-        self.client_state = State.CONECTED
+        self.server_down = threading.Event()
+        self.server_last_seen_lock = threading.Lock()
+        self.server_last_seen = time.time()
         
+        heartbeat_monitor_thread = threading.Thread(target=self.heartbeat_monitor, args=(), daemon=True)
+        heartbeat_monitor_thread.start()
+       
+        heartbeat_listener_thread = threading.Thread(target=self.start_heartbeat_listener, args=(), daemon=True)
+        heartbeat_listener_thread.start()
+
+        heartbeat_producer_thread = threading.Thread(target=self.start_heartbeat_producer, args=(), daemon=True)
+        heartbeat_producer_thread.start()
+
+        self.client_state = State.CONECTED
 
     def get_new_task(self) -> nn.Module:
         if self.client_state != State.READY:
@@ -113,6 +133,11 @@ class SimpleClient:
 
         result = self.task_consumer.consume_message(1000, cid=self.cid)
         if result and result[0]:
+            if(result[0].value.get('type') == MessageType.DISCONNECT):
+                logging.warning("Server shut down. Stopping the client.")
+                self.server_down.set()
+                return None
+            
             params_file = result[0].value.get('payload')
             self.s3_client.download_file(
                 self.localstack_bucket,
@@ -130,12 +155,19 @@ class SimpleClient:
                 raise ValueError("The loaded state_dict is not a dictionary.")
             self.model.load_state_dict(state_dict, strict=True)
             return self.model
+        
+        if self.server_down.is_set():
+            raise Exception("Connection to the Server is down. Cannot get new task.")
+        
         return None
 
 
     def publish_updated_model(self, 
                               model: nn.Module,
                               training_info: dict = None):
+        if self.server_down.is_set():
+            raise Exception("Connection to the Server is down. Cannot publish task.")
+        
         state_dict = model.state_dict()
         
         file_name = f"local_{self.cid}_{int(time.time())}.pth"
@@ -159,6 +191,9 @@ class SimpleClient:
         self.client_state = State.FINISHED
 
     def close(self):
+        if self.server_down.is_set():
+            raise Exception("Connection to the Server is down. Cannot get new task.")
+        
         connect_message = Message(
             cid=self.cid,
             type=MessageType.DISCONNECT,
@@ -168,3 +203,43 @@ class SimpleClient:
 
         logging.debug(f"Client {self.cid} disconnected")
         self.client_logs_producer.send_message(connect_message)
+
+    def start_heartbeat_listener(self):
+        heartbeat_consumer = SimpleMessageConsumer(
+            self.kafka_server,
+            self.server_heartbeat_topic
+        )
+
+        while not self.server_down.is_set():
+            heartbeat_message = heartbeat_consumer.consume_message(1000)
+            if heartbeat_message:
+                for msg in heartbeat_message:
+                    self.server_last_seen_lock.acquire()
+                    self.server_last_seen = time.time()
+                    self.server_last_seen_lock.release()
+            time.sleep(2)
+                    
+    def start_heartbeat_producer(self):
+        heartbeat_producer = SimpleMessageProducer(
+            self.kafka_server,
+            self.client_heartbeat_topic
+        )
+
+        while not self.server_down.is_set():
+            heartbeat_message = Message(
+                    cid=self.cid,
+                    type=MessageType.HEARTBEAT,
+                    timestamp=None,
+                    payload=None
+                )
+            heartbeat_producer.send_message(heartbeat_message)
+            time.sleep(2)
+    
+    def heartbeat_monitor(self):
+        while not self.server_down.is_set():
+            self.server_last_seen_lock.acquire()
+            if time.time() - self.server_last_seen > 10:
+                logging.warning(f"Server is down. Last seen at {self.server_last_seen}.")
+                self.server_down.set()
+            self.server_last_seen_lock.release()
+            time.sleep(2)
