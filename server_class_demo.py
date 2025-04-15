@@ -1,6 +1,5 @@
 from fl_platform.src.server import SimpleServer
 from fl_platform.src.strategy.fed_fa import FedFA
-from model import Net
 
 strategy = FedFA(k=2)  # Example strategy with k=5
 

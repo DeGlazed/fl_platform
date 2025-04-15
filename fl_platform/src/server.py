@@ -12,7 +12,7 @@ from collections import OrderedDict
 import torch
 import os
 
-class SimpleServer:
+class SimpleServer():
     def __init__(self, 
                 min_clients : int,
                 strategy : AbstractStrategy,
@@ -130,17 +130,23 @@ class SimpleServer:
                     self.task_producer.send_message(task_message)
                     self.client_manager.set_busy(client_id)
 
+                evaluator_message = Message(
+                    cid=None,
+                    type=MessageType.TASK,
+                    timestamp=str(time.time()),
+                    payload='snapshot_0.params'
+                )
+                self.task_producer.send_message(evaluator_message)
+
                 just_started = False
 
             else:
-                
                 #Check stopping condition
                 if len(self.client_manager.get_all_clients()) < self.min_clients:
                     logging.warning(f"Less than {self.min_clients} clients connected. Stopping server.")
                     self.server_stop.set()
                     break
 
-                logging.info(f"Server is running with {len(self.client_manager.get_all_clients())} clients.")
                 result = self.local_consumer.consume_message(1000)
                 
                 if result:
@@ -160,45 +166,52 @@ class SimpleServer:
                                 state_dict[key] = value.cpu().numpy()
 
                         logging.info(f"Received local parameters from client {client_id}.")
-                        number_of_next_samples, new_global_state_dict = self.strategy.aggregate(state_dict, training_info)
                         self.client_manager.set_finished(client_id)
+                        number_of_next_samples, new_global_state_dict = self.strategy.aggregate(state_dict, training_info)
                         
                         if number_of_next_samples is not None:
                             self.client_pool += number_of_next_samples
                             self.current_global_state_dict = new_global_state_dict
                             
-                            number_of_ready_clients = len(self.client_manager.get_all_ready_clients())
-                            
-                            if number_of_ready_clients > 0 :
-                                selected_ready_clients = None
-                                if self.client_pool >= number_of_ready_clients:
-                                    selected_ready_clients = self.client_manager.get_all_ready_clients()
-                                    self.client_pool -= number_of_ready_clients
-                                else:
-                                    selected_ready_clients = self.client_manager.sample_ready_clients(self.client_pool)
-                                    self.client_pool = 0
+                number_of_ready_clients = len(self.client_manager.get_all_ready_clients())
+                
+                if number_of_ready_clients > 0  and self.client_pool > 0:
+                    selected_ready_clients = None
+                    if self.client_pool >= number_of_ready_clients:
+                        selected_ready_clients = self.client_manager.get_all_ready_clients()
+                        self.client_pool -= number_of_ready_clients
+                    else:
+                        selected_ready_clients = self.client_manager.sample_ready_clients(self.client_pool)
+                        self.client_pool = 0
 
-                                torch.save(self.current_global_state_dict, f'snapshot_{self.snapshot}.params')
-                                self.s3_client.upload_file(
-                                    f'snapshot_{self.snapshot}.params',
-                                    self.localstack_bucket,
-                                    f'snapshot_{self.snapshot}.params'
-                                )
-                                os.remove(f'snapshot_{self.snapshot}.params')
+                    torch.save(self.current_global_state_dict, f'snapshot_{self.snapshot}.params')
+                    self.s3_client.upload_file(
+                        f'snapshot_{self.snapshot}.params',
+                        self.localstack_bucket,
+                        f'snapshot_{self.snapshot}.params'
+                    )
+                    os.remove(f'snapshot_{self.snapshot}.params')
 
-                                for client in selected_ready_clients:
-                                    logging.info(f"Sending global parameters to client {client}...")
-                                    task_message = Message(
-                                        cid=client,
-                                        type=MessageType.TASK,
-                                        timestamp=str(time.time()),
-                                        payload=f'snapshot_{self.snapshot}.params'
-                                    )
-                                    self.task_producer.send_message(task_message)
-                                    self.client_manager.set_busy(client)
+                    for client in selected_ready_clients:
+                        logging.info(f"Sending global parameters to client {client}...")
+                        task_message = Message(
+                            cid=client,
+                            type=MessageType.TASK,
+                            timestamp=str(time.time()),
+                            payload=f'snapshot_{self.snapshot}.params'
+                        )
+                        self.task_producer.send_message(task_message)
+                        self.client_manager.set_busy(client)
+                    
+                    evaluator_message = Message(
+                        cid=None,
+                        type=MessageType.TASK,
+                        timestamp=str(time.time()),
+                        payload=f'snapshot_{self.snapshot}.params'
+                    )
+                    self.task_producer.send_message(evaluator_message)
 
-                                self.snapshot += 1
-                time.sleep(5)
+                    self.snapshot += 1
         
         logging.info("Server stopped.")
         for client in self.client_manager.get_all_clients():
@@ -347,7 +360,7 @@ class SimpleServer:
                     client_id = msg.value.get('header').get('cid')
                     if client_id in self.client_manager.get_all_clients():
                         self.client_manager.update_client_last_seen(client_id)
-                        logging.info(f"Received heartbeat from client {client_id}.")
+                        logging.debug(f"Received heartbeat from client {client_id}.")
                     else:
                         logging.warning(f"Received heartbeat from unknown client {client_id}.")
 

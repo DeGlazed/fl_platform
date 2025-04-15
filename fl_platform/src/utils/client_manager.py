@@ -2,6 +2,7 @@ from enum import Enum
 import threading
 import random
 import time
+import logging
 
 class ClientState(Enum) :
     CONNECTED = 0
@@ -31,6 +32,7 @@ class ClientManager() :
         return state
 
     def set_client_state(self, client_id, state) :
+        logging.info(f"Client {client_id} state changed to {state}")
         self.client_state_lock.acquire()
         self.client_state[client_id] = state
         if(state == ClientState.CONNECTED) :

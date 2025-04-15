@@ -16,7 +16,7 @@ class State() :
     BUSY = 2
     FINISHED = 3
 
-class SimpleClient:
+class SimpleClient():
     def __init__(self, 
                 model: nn.Module,
 
@@ -58,11 +58,12 @@ class SimpleClient:
         mac = uuid.getnode()
         data = f"{time.time()}_{mac}"
         self.cid = hashlib.sha256(data.encode()).hexdigest()
+        
         logging.info(f"Client ID: {self.cid}")
-
-        init_state_dict = self.model.state_dict()
-
-        torch.save(init_state_dict, f"init_{self.cid}.pth")
+        
+        self.tmp_dir = f"tmp_{self.cid}"
+        if not os.path.exists(self.tmp_dir):
+            os.makedirs(self.tmp_dir)
 
         self.s3_client = boto3.client(
             's3',
@@ -72,11 +73,17 @@ class SimpleClient:
             region_name=self.localstack_region_name
         )
 
+        init_state_dict = self.model.state_dict()
+
+        obj_name = "init_{self.cid}.pth"
+        file_path = f"{self.tmp_dir}/" + obj_name
+        torch.save(init_state_dict, file_path)
+
         # Upload the initial state dictionary to S3
         self.s3_client.upload_file(
-            f"init_{self.cid}.pth",
+            file_path,
             self.localstack_bucket,
-            f"init_{self.cid}.pth"
+            obj_name
         )
 
         self.client_logs_producer = SimpleMessageProducer(
@@ -88,12 +95,12 @@ class SimpleClient:
             cid=self.cid,
             type=MessageType.CONNECT,
             timestamp=str(time.time()),
-            payload=f"init_{self.cid}.pth"
+            payload=obj_name
         )
 
         logging.info(f"Client {self.cid} started")
         self.client_logs_producer.send_message(connect_message)
-        os.remove(f"init_{self.cid}.pth")
+        os.remove(file_path)
 
         self.task_consumer = SimpleMessageConsumer(
             self.kafka_server,
@@ -138,22 +145,26 @@ class SimpleClient:
                 self.server_down.set()
                 return None
             
-            params_file = result[0].value.get('payload')
+            params_obj = result[0].value.get('payload')
+            file_path = self.tmp_dir + "/" + params_obj
             self.s3_client.download_file(
                 self.localstack_bucket,
-                params_file,
-                params_file
+                params_obj,
+                file_path
             )
 
             # Convert numpy arrays to torch tensors
-            state_dict = torch.load(params_file)
+            state_dict = torch.load(file_path)
             for key, value in state_dict.items():
                 if isinstance(value, np.ndarray):
                     state_dict[key] = torch.tensor(value)
 
             if not isinstance(state_dict, dict):
                 raise ValueError("The loaded state_dict is not a dictionary.")
+            
             self.model.load_state_dict(state_dict, strict=True)
+            os.remove(file_path)
+
             return self.model
         
         if self.server_down.is_set():
@@ -170,21 +181,22 @@ class SimpleClient:
         
         state_dict = model.state_dict()
         
-        file_name = f"local_{self.cid}_{int(time.time())}.pth"
-        torch.save(state_dict, file_name)
+        obj_name = f"local_{self.cid}_{int(time.time())}.pth"
+        file_path = f"{self.tmp_dir}/" + obj_name
+        torch.save(state_dict, file_path)
         
         self.s3_client.upload_file(
-            file_name,
+            file_path,
             self.localstack_bucket,
-            file_name
+            obj_name
         )
-        os.remove(file_name)
+        os.remove(file_path)
 
         result_message = Message(
                 cid=self.cid,
                 type=MessageType.TASK,
                 timestamp=str(time.time()),
-                payload=file_name,
+                payload=obj_name,
                 training_info=training_info
             )
         self.result_producer.send_message(result_message)
@@ -243,3 +255,98 @@ class SimpleClient:
                 self.server_down.set()
             self.server_last_seen_lock.release()
             time.sleep(2)
+
+class SimpleEvaluator():
+    
+    def __init__(self,
+                 model: nn.Module,
+                 test_loader: torch.utils.data.DataLoader,
+
+                 kafka_server: str,
+                 model_topic: str,
+                #  result_topic: str,
+
+                 localstack_server: str,
+                 localstack_bucket: str,
+
+                 localstack_access_key_id: str = "test",
+                 localstack_secret_access_key: str = "test",
+                 localstack_region_name: str = 'us-east-1'):
+        
+        self.model = model
+        self.test_loader = test_loader
+
+        self.kafka_server = kafka_server
+        self.model_topic = model_topic
+
+        self.localstack_server = localstack_server
+        self.localstack_bucket = localstack_bucket
+
+        self.localstack_access_key_id = localstack_access_key_id
+        self.localstack_secret_access_key = localstack_secret_access_key
+        self.localstack_region_name = localstack_region_name
+
+        self.setup_evaluator()
+
+    def setup_evaluator(self):
+        self.s3_cli = boto3.client(
+            's3',
+            endpoint_url=self.localstack_server,
+            aws_access_key_id=self.localstack_access_key_id,
+            aws_secret_access_key=self.localstack_secret_access_key,
+            region_name=self.localstack_region_name
+        )
+
+        self.msg_consumer = SimpleMessageConsumer(
+            self.kafka_server,
+            self.model_topic
+        )
+
+
+
+    def start_evaluate(self) -> dict:
+        while True:
+            result = self.msg_consumer.consume_message(1000)
+            if result:
+                for msg in result:
+                    if(msg.value.get('header').get('cid') is None):
+                        logging.info("Received model for evaluation")
+
+                        params_obj = msg.value.get('payload')
+                        local_file = "eval_" + params_obj
+                        self.s3_cli.download_file(
+                            self.localstack_bucket,
+                            params_obj,
+                            local_file
+                        )
+
+                        state_dict = torch.load(local_file)
+                        for key, value in state_dict.items():
+                            if isinstance(value, np.ndarray):
+                                state_dict[key] = torch.tensor(value)
+
+                        if not isinstance(state_dict, dict):
+                            raise ValueError("The loaded state_dict is not a dictionary.")
+                        self.model.load_state_dict(state_dict, strict=True)
+                        os.remove(local_file)
+
+                        result = self.evaluate()
+                        logging.info(f"Evaluation result for {local_file}: {result}")
+
+    def evaluate(self) -> dict:
+        self.model.eval()
+        total_loss = 0
+        correct = 0
+        total = 0
+
+        with torch.no_grad():
+            for data, target in self.test_loader:
+                output = self.model(data)
+                loss = nn.CrossEntropyLoss()(output, target)
+                total_loss += loss.item()
+                _, predicted = torch.max(output.data, 1)
+                total += target.size(0)
+                correct += (predicted == target).sum().item()
+
+        accuracy = 100 * correct / total
+        return {"loss": total_loss / len(self.test_loader), "accuracy": accuracy}
