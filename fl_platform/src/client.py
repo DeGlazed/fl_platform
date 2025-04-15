@@ -273,6 +273,7 @@ class SimpleEvaluator():
                  localstack_secret_access_key: str = "test",
                  localstack_region_name: str = 'us-east-1'):
         
+        logging.basicConfig(level=logging.INFO)
         self.model = model
         self.test_loader = test_loader
 
@@ -301,8 +302,6 @@ class SimpleEvaluator():
             self.kafka_server,
             self.model_topic
         )
-
-
 
     def start_evaluate(self) -> dict:
         while True:

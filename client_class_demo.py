@@ -15,7 +15,7 @@ partition_id = args.c
 num_partitions = args.p
 time_sleep = args.s
 
-trainloader, testloader = load_data(partition_id, num_partitions)
+TRAINLOADER, TESTLOADER = load_data(partition_id, num_partitions)
 
 model = MiniNet()
 
@@ -39,11 +39,11 @@ while True:
         print("Start training")
         
         train_dataset, val_dataset = torch.utils.data.random_split(
-            trainloader.dataset,
-            [int(len(trainloader.dataset) * 0.8), len(trainloader.dataset) - int(len(trainloader.dataset) * 0.8)]
+            TRAINLOADER.dataset,
+            [int(len(TRAINLOADER.dataset) * 0.8), len(TRAINLOADER.dataset) - int(len(TRAINLOADER.dataset) * 0.8)]
         )
-        trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=trainloader.batch_size, shuffle=True)
-        valloader = torch.utils.data.DataLoader(val_dataset, batch_size=trainloader.batch_size, shuffle=False)
+        trainloader = torch.utils.data.DataLoader(train_dataset, batch_size=TRAINLOADER.batch_size, shuffle=True)
+        valloader = torch.utils.data.DataLoader(val_dataset, batch_size=TRAINLOADER.batch_size, shuffle=False)
 
         results = train(model, trainloader, valloader, epochs=10)
         print("Finished training with results:", results)
