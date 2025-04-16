@@ -1,10 +1,10 @@
 from fl_platform.src.server import SimpleServer
 from fl_platform.src.strategy.fed_fa import FedFA
 
-strategy = FedFA(k=2)  # Example strategy with k=5
+strategy = FedFA(k=5)  # Example strategy with k=5
 
 server = SimpleServer(
-    min_clients=2,
+    min_clients=5,
     strategy=strategy,
     
     kafka_server='localhost:29092',
