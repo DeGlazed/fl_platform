@@ -7,10 +7,11 @@ import time
 import threading
 from .utils.client_manager import ClientManager, ClientState
 from .strategy.strategy import AbstractStrategy
-from .utils.message_utils import SimpleMessageConsumer, SimpleMessageProducer, MessageType, Message
+from .utils.message_utils import SimpleMessageConsumer, SimpleMessageProducer, MessageType, Message, SecureMessageProducer, SecureMessageConsumer
 from collections import OrderedDict
 import torch
 import os
+import ssl
 
 class SimpleServer():
     def __init__(self, 
@@ -30,7 +31,11 @@ class SimpleServer():
 
                 localstack_access_key_id : str = "test",
                 localstack_secret_access_key : str = "test",
-                localstack_region_name : str = 'us-east-1'
+                localstack_region_name : str = 'us-east-1',
+
+                ca_certificate_file_path : str = None,
+                certificate_file_path : str = None,
+                key_file_path : str = None,
                 ):
         
         logging.basicConfig(level=logging.INFO)
@@ -52,6 +57,10 @@ class SimpleServer():
         self.localstack_secret_access_key = localstack_secret_access_key
         self.localstack_region_name = localstack_region_name
 
+        self.ca_certificate_file_path = ca_certificate_file_path
+        self.certificate_file_path = certificate_file_path
+        self.key_file_path = key_file_path
+
         self.s3_client = None
 
         self.client_manager = ClientManager()
@@ -61,21 +70,42 @@ class SimpleServer():
         self.current_global_state_dict = None
         self.snapshot = 1
 
+        self.ssl_context = None
+        if self.ca_certificate_file_path and self.certificate_file_path and self.key_file_path:
+            self.ssl_context = ssl.create_default_context(cafile=self.ca_certificate_file_path)
+            self.ssl_context.load_cert_chain(certfile=self.certificate_file_path, keyfile=self.key_file_path)
+
     def start_server(self):
         setup_server_successful = self.setup_server()
         if not setup_server_successful:
             logging.error("Server setup failed. Exiting...")
             return
-        
-        self.task_producer = SimpleMessageProducer(
-            self.kafka_server,
-            self.global_models_topic
-        )
 
-        self.local_consumer = SimpleMessageConsumer(
-            self.kafka_server,
-            self.local_models_topic
-        )
+        if self.ssl_context:
+            self.task_producer = SecureMessageProducer(
+                self.kafka_server,
+                self.global_models_topic,
+                self.ssl_context
+            )
+
+            self.local_consumer = SecureMessageConsumer(
+                self.kafka_server,
+                self.local_models_topic,
+                self.ssl_context
+            )
+            logging.info("Using secure Kafka connection.")
+
+        else :
+            self.task_producer = SimpleMessageProducer(
+                self.kafka_server,
+                self.global_models_topic
+            )
+
+            self.local_consumer = SimpleMessageConsumer(
+                self.kafka_server,
+                self.local_models_topic
+            )
+            logging.info("Using insecure Kafka connection.")
         
         logging.info("Server setup completed successfully.")
         logging.info("Starting server...")
@@ -246,10 +276,19 @@ class SimpleServer():
     def setup_kafka(self) -> bool:
         admin_client = None
         try:
-            admin_client = KafkaAdminClient(
-                bootstrap_servers=self.kafka_server, 
-                client_id='admin'
-            )
+            admin_client = None
+            if self.ssl_context:
+                admin_client = KafkaAdminClient(
+                    bootstrap_servers=self.kafka_server,
+                    client_id='admin',
+                    security_protocol='SSL',
+                    ssl_context=self.ssl_context
+                )
+            else:
+                admin_client = KafkaAdminClient(
+                    bootstrap_servers=self.kafka_server, 
+                    client_id='admin'
+                )
 
             if not self.client_logs_topic :
                 self.client_logs_topic = 'client-logs'+'-'+str(random.randint(0, 10000))
@@ -305,7 +344,12 @@ class SimpleServer():
         return True
     
     def startClientHandler(self) :
-        message_consumer = SimpleMessageConsumer(self.kafka_server, self.client_logs_topic)
+        message_consumer = None
+        if self.ssl_context:
+            message_consumer = SecureMessageConsumer(self.kafka_server, self.client_logs_topic, self.ssl_context)
+        else:
+            message_consumer = SimpleMessageConsumer(self.kafka_server, self.client_logs_topic)
+
         s3_client = boto3.client(
             's3',
             endpoint_url=self.localstack_server,
@@ -348,10 +392,18 @@ class SimpleServer():
             time.sleep(1)
 
     def start_heartbeat_listener(self):
-        heartbeat_consumer = SimpleMessageConsumer(
-            self.kafka_server,
-            self.client_heartbeat_topic
-        )
+        heartbeat_consumer = None
+        if self.ssl_context:
+            heartbeat_consumer = SecureMessageConsumer(
+                self.kafka_server,
+                self.client_heartbeat_topic,
+                self.ssl_context
+            )
+        else:
+            heartbeat_consumer = SimpleMessageConsumer(
+                self.kafka_server,
+                self.client_heartbeat_topic
+            )
 
         while not self.server_stop.is_set():
             heartbeat_message = heartbeat_consumer.consume_message(1000)
@@ -365,10 +417,17 @@ class SimpleServer():
                         logging.warning(f"Received heartbeat from unknown client {client_id}.")
 
     def start_heartbeat_producer(self):
-        heartbeat_producer = SimpleMessageProducer(
-            self.kafka_server,
-            self.server_heartbeat_topic
-        )
+        if self.ssl_context:
+            heartbeat_producer = SecureMessageProducer(
+                self.kafka_server,
+                self.server_heartbeat_topic,
+                self.ssl_context
+            )
+        else:
+            heartbeat_producer = SimpleMessageProducer(
+                self.kafka_server,
+                self.server_heartbeat_topic
+            )
 
         while not self.server_stop.is_set():
             heartbeat_message = Message(

@@ -3,12 +3,13 @@ import hashlib
 import uuid
 import logging
 import torch.nn as nn
-from .utils.message_utils import SimpleMessageProducer, SimpleMessageConsumer, MessageType, Message
+from .utils.message_utils import SimpleMessageProducer, SimpleMessageConsumer, MessageType, Message, SecureMessageConsumer, SecureMessageProducer
 import torch
 import boto3
 import os
 import numpy as np
 import threading
+import ssl
 
 class State() :
     CONECTED = 0
@@ -32,7 +33,11 @@ class SimpleClient():
                 localstack_bucket: str,
                 localstack_access_key_id: str = "test",
                 localstack_secret_access_key: str = "test",
-                localstack_region_name: str = 'us-east-1'
+                localstack_region_name: str = 'us-east-1',
+
+                ca_certificate_file_path : str = None,
+                certificate_file_path : str = None,
+                key_file_path : str = None,
                 ):
         
         logging.basicConfig(level=logging.INFO)
@@ -50,6 +55,15 @@ class SimpleClient():
         self.localstack_access_key_id = localstack_access_key_id
         self.localstack_secret_access_key = localstack_secret_access_key
         self.localstack_region_name = localstack_region_name
+
+        self.ca_certificate_file_path = ca_certificate_file_path
+        self.certificate_file_path = certificate_file_path
+        self.key_file_path = key_file_path
+
+        self.ssl_context = None
+        if self.ca_certificate_file_path and self.certificate_file_path and self.key_file_path:
+            self.ssl_context = ssl.create_default_context(cafile=self.ca_certificate_file_path)
+            self.ssl_context.load_cert_chain(certfile=self.certificate_file_path, keyfile=self.key_file_path)
 
         self.setup_client()
 
@@ -86,10 +100,18 @@ class SimpleClient():
             obj_name
         )
 
-        self.client_logs_producer = SimpleMessageProducer(
-            self.kafka_server,
-            self.client_logs_topic
-        )
+        self.client_logs_producer = None
+        if self.ssl_context:
+            self.client_logs_producer = SecureMessageProducer(
+                self.kafka_server,
+                self.client_logs_topic,
+                self.ssl_context
+            )
+        else:
+            self.client_logs_producer = SimpleMessageProducer(
+                self.kafka_server,
+                self.client_logs_topic
+            )
 
         connect_message = Message(
             cid=self.cid,
@@ -102,15 +124,31 @@ class SimpleClient():
         self.client_logs_producer.send_message(connect_message)
         os.remove(file_path)
 
-        self.task_consumer = SimpleMessageConsumer(
-            self.kafka_server,
-            self.global_models_topic
-        )
+        self.task_consumer = None
+        if self.ssl_context:
+            self.task_consumer = SecureMessageConsumer(
+                self.kafka_server,
+                self.global_models_topic,
+                self.ssl_context
+            )
+        else:
+            self.task_consumer = SimpleMessageConsumer(
+                self.kafka_server,
+                self.global_models_topic
+            )
 
-        self.result_producer = SimpleMessageProducer(
-            self.kafka_server,
-            self.local_models_topic
-        )
+        self.result_producer = None
+        if self.ssl_context:
+            self.result_producer = SecureMessageProducer(
+                self.kafka_server,
+                self.local_models_topic,
+                self.ssl_context
+            )
+        else:
+            self.result_producer = SimpleMessageProducer(
+                self.kafka_server,
+                self.local_models_topic
+            )
 
         self.server_down = threading.Event()
         self.server_last_seen_lock = threading.Lock()
@@ -217,10 +255,18 @@ class SimpleClient():
         self.client_logs_producer.send_message(connect_message)
 
     def start_heartbeat_listener(self):
-        heartbeat_consumer = SimpleMessageConsumer(
-            self.kafka_server,
-            self.server_heartbeat_topic
-        )
+        heartbeat_consumer = None
+        if self.ssl_context:
+            heartbeat_consumer = SecureMessageConsumer(
+                self.kafka_server,
+                self.server_heartbeat_topic,
+                self.ssl_context
+            )
+        else:
+            heartbeat_consumer = SimpleMessageConsumer(
+                self.kafka_server,
+                self.server_heartbeat_topic
+            )
 
         while not self.server_down.is_set():
             heartbeat_message = heartbeat_consumer.consume_message(1000)
@@ -232,10 +278,18 @@ class SimpleClient():
             time.sleep(2)
                     
     def start_heartbeat_producer(self):
-        heartbeat_producer = SimpleMessageProducer(
-            self.kafka_server,
-            self.client_heartbeat_topic
-        )
+        heartbeat_producer = None
+        if self.ssl_context:
+            heartbeat_producer = SecureMessageProducer(
+                self.kafka_server,
+                self.client_heartbeat_topic,
+                self.ssl_context
+            )
+        else:
+            heartbeat_producer = SimpleMessageProducer(
+                self.kafka_server,
+                self.client_heartbeat_topic
+            )
 
         while not self.server_down.is_set():
             heartbeat_message = Message(
@@ -259,19 +313,24 @@ class SimpleClient():
 class SimpleEvaluator():
     
     def __init__(self,
-                 model: nn.Module,
-                 test_loader: torch.utils.data.DataLoader,
+                model: nn.Module,
+                test_loader: torch.utils.data.DataLoader,
 
-                 kafka_server: str,
-                 model_topic: str,
+                kafka_server: str,
+                model_topic: str,
                 #  result_topic: str,
 
-                 localstack_server: str,
-                 localstack_bucket: str,
+                localstack_server: str,
+                localstack_bucket: str,
 
-                 localstack_access_key_id: str = "test",
-                 localstack_secret_access_key: str = "test",
-                 localstack_region_name: str = 'us-east-1'):
+                localstack_access_key_id: str = "test",
+                localstack_secret_access_key: str = "test",
+                localstack_region_name: str = 'us-east-1',
+                
+                ca_certificate_file_path : str = None,
+                certificate_file_path : str = None,
+                key_file_path : str = None,
+                ):
         
         logging.basicConfig(level=logging.INFO)
         self.model = model
@@ -287,6 +346,15 @@ class SimpleEvaluator():
         self.localstack_secret_access_key = localstack_secret_access_key
         self.localstack_region_name = localstack_region_name
 
+        self.ca_certificate_file_path = ca_certificate_file_path
+        self.certificate_file_path = certificate_file_path
+        self.key_file_path = key_file_path
+
+        self.ssl_context = None
+        if self.ca_certificate_file_path and self.certificate_file_path and self.key_file_path:
+            self.ssl_context = ssl.create_default_context(cafile=self.ca_certificate_file_path)
+            self.ssl_context.load_cert_chain(certfile=self.certificate_file_path, keyfile=self.key_file_path)
+
         self.setup_evaluator()
 
     def setup_evaluator(self):
@@ -298,10 +366,18 @@ class SimpleEvaluator():
             region_name=self.localstack_region_name
         )
 
-        self.msg_consumer = SimpleMessageConsumer(
-            self.kafka_server,
-            self.model_topic
-        )
+        self.msg_consumer = None
+        if self.ssl_context:
+            self.msg_consumer = SecureMessageConsumer(
+                self.kafka_server,
+                self.model_topic,
+                self.ssl_context
+            )
+        else:
+            self.msg_consumer = SimpleMessageConsumer(
+                self.kafka_server,
+                self.model_topic
+            )
 
     def start_evaluate(self) -> dict:
         while True:
