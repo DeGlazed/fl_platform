@@ -10,6 +10,7 @@ import os
 import numpy as np
 import threading
 import ssl
+import requests
 
 class State() :
     CONECTED = 0
@@ -358,6 +359,10 @@ class SimpleEvaluator():
         self.setup_evaluator()
 
     def setup_evaluator(self):
+        mac = uuid.getnode()
+        data = f"{time.time()}_{mac}"
+        self.cid = hashlib.sha256(data.encode()).hexdigest()
+
         self.s3_cli = boto3.client(
             's3',
             endpoint_url=self.localstack_server,
@@ -378,6 +383,7 @@ class SimpleEvaluator():
                 self.kafka_server,
                 self.model_topic
             )
+        logging.info(f"Evaluator {self.cid} started")
 
     def start_evaluate(self) -> dict:
         while True:
@@ -406,6 +412,13 @@ class SimpleEvaluator():
                         os.remove(local_file)
 
                         result = self.evaluate()
+                        self.push_metrics(
+                            model_id="demo",
+                            client_id=self.cid,
+                            accuracy=result["accuracy"],
+                            loss=result["loss"],
+                            round_id=int(float(msg.value.get('header').get('timestamp')))
+                        )
                         logging.info(f"Evaluation result for {local_file}: {result}")
 
     def evaluate(self) -> dict:
@@ -425,3 +438,19 @@ class SimpleEvaluator():
 
         accuracy = 100 * correct / total
         return {"loss": total_loss / len(self.test_loader), "accuracy": accuracy}
+    
+    def push_metrics(self, model_id, client_id, accuracy, loss, round_id):
+        metrics = f"""
+        model_accuracy{{model_id=\"{model_id}\",client=\"{client_id}\"}} {accuracy}
+        model_loss{{model_id=\"{model_id}\",client=\"{client_id}\"}} {loss}
+        """
+        # response = requests.post(
+        #     f"http://localhost:9091/metrics/job/{client_id}/round/{round_id}",
+        #     data=metrics.encode('utf-8')
+        # )
+
+        response = requests.post(
+            f"http://localhost:9091/metrics/job/{client_id}",
+            data=metrics.encode('utf-8')
+        )
+        print(f"{response.status_code} - {response.text}")
