@@ -1,8 +1,9 @@
 from fl_platform.src.client import SimpleEvaluator
-from model import MiniNet
+from model import MiniNet, ResNet18
 from dataset import load_data
 
-model = MiniNet()
+# model = MiniNet()
+model = ResNet18()
 _, testloader = load_data(0, 1)
 
 evaluator = SimpleEvaluator(

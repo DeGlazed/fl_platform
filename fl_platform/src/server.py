@@ -190,7 +190,7 @@ class SimpleServer():
                             raise ValueError("The loaded state_dict is not an OrderedDict.")
                         os.remove(params_file)
 
-                        # Convert state_dict tensors from CUDA to numpy (xpu)
+                        # Convert state_dict tensors from CUDA to numpy (cpu)
                         for key, value in state_dict.items():
                             if value.is_cuda:
                                 state_dict[key] = value.cpu().numpy()

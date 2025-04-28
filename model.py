@@ -8,6 +8,8 @@ from torchvision.datasets import CIFAR10
 from torchvision.transforms import Compose, Normalize, ToTensor
 import numpy as np
 import random
+from torchvision.models import resnet18
+from torchvision.transforms import Resize
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -44,6 +46,17 @@ class MiniNet(nn.Module):
         x = self.fc1(x)
         return x
     
+class ResNet18(nn.Module):
+    def __init__(self):
+        super(ResNet18, self).__init__()
+        self.resnet = resnet18(pretrained=False)
+        self.resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.resnet.fc = nn.Linear(self.resnet.fc.in_features, 10)
+
+    def forward(self, x):
+        x = self.resnet(x)
+        return x
+
 def train(net, trainloader, valloader, epochs, device = DEVICE):
     """Train the model on the training set."""
     print("Training on device:", device)

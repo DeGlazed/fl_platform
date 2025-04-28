@@ -1,5 +1,5 @@
 from fl_platform.src.client import SimpleClient
-from model import MiniNet, train
+from model import MiniNet, train, ResNet18
 from dataset import load_data
 import argparse
 import time
@@ -17,7 +17,8 @@ time_sleep = args.s
 
 TRAINLOADER, TESTLOADER = load_data(partition_id, num_partitions)
 
-model = MiniNet()
+# model = MiniNet()
+model = ResNet18()
 
 client = SimpleClient(
     model=model,

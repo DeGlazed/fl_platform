@@ -195,7 +195,7 @@ class SimpleClient():
             # Convert numpy arrays to torch tensors
             state_dict = torch.load(file_path)
             for key, value in state_dict.items():
-                if isinstance(value, np.ndarray):
+                if not isinstance(value, torch.Tensor):
                     state_dict[key] = torch.tensor(value)
 
             if not isinstance(state_dict, dict):
@@ -403,7 +403,7 @@ class SimpleEvaluator():
 
                         state_dict = torch.load(local_file)
                         for key, value in state_dict.items():
-                            if isinstance(value, np.ndarray):
+                            if not isinstance(value, torch.Tensor):
                                 state_dict[key] = torch.tensor(value)
 
                         if not isinstance(state_dict, dict):
