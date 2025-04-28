@@ -1,32 +1,14 @@
-class Model:
-    def __init__(self, model_type='linear', input_dim=1):
-        self.model_type = model_type
-        self.input_dim = input_dim
-        self.model = self.initialize_model()
+from torch import nn
 
-    def initialize_model(self):
-        if self.model_type == 'linear':
-            # Initialize a linear model
-            return self.create_linear_model()
-        # Add other model types as needed
-        raise ValueError("Unsupported model type")
+class SimpleLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, num_classes):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.classifier = nn.Linear(hidden_size, num_classes)
 
-    def create_linear_model(self):
-        # Placeholder for linear model creation logic
-        pass
-
-    def train(self, data, labels):
-        # Placeholder for model training logic
-        pass
-
-    def evaluate(self, test_data, test_labels):
-        # Placeholder for model evaluation logic
-        pass
-
-    def save_model(self, file_path):
-        # Placeholder for saving the model to a file
-        pass
-
-    def load_model(self, file_path):
-        # Placeholder for loading the model from a file
-        pass
+    def forward(self, x, lengths):
+        lengths = lengths.cpu()
+        packed = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        _ , (hn, _) = self.lstm(packed)
+        out = self.classifier(hn[-1]) # Lasti hidden layer
+        return out
