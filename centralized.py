@@ -15,16 +15,29 @@ def pad_collate(batch):
 
 if __name__ == "__main__":
 
-    labels = ['run', 'walk', 'bus', 'car', 'taxi', 'subway', 'train', 'bike', 'motorcycle']
-    sorted_labels = sorted(labels)
-    label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
-    
     with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
         geo_dataset = pickle.load(f)
     
+    filter_geo_dataset = {}
+    for client_id, data in geo_dataset.items():
+        filtered_data_dict = {}
+        for lable, df in data.items():
+            if 'run' not in lable and 'motorcycle' not in lable:
+                filtered_data_dict[lable] = df
+        filter_geo_dataset[client_id] = filtered_data_dict
+    geo_dataset = filter_geo_dataset
+                    
+    labels = ['walk', 'bus', 'car', 'taxi', 'subway', 'train', 'bike'] #removed 'run' and 'motorcycle'
+    sorted_labels = sorted(labels)
+    label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
+
+
     selected_clients = list(range(1, 65))
 
-    dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping)
+    # dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping)
+    dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping,
+        feature_extractor=GeoLifeMobilityDataset.rich_extractor
+    )
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
 
     # Print total number of data samples in dataloader
@@ -32,10 +45,14 @@ if __name__ == "__main__":
     print(f"Total number of data samples in dataloader: {total_samples}")
 
     # Define Model
-    input_size = 3  # latitude, longitude, timestamp
+    input_size = 5
     hidden_size = 64
     num_layers = 1
     num_classes = len(dataset.label_mapping)
+
+    for sequences, lengths, labels in dataloader:
+        print(sequences.shape)  # should print: (batch_size, seq_len, 5)
+        break
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
