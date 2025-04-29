@@ -4,3 +4,4 @@ dataset/
 tmp_*
 raw/
 *.pkl
+*venv*
