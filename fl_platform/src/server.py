@@ -66,6 +66,7 @@ class SimpleServer():
         self.client_manager = ClientManager()
         self.server_stop = threading.Event()
 
+        self.client_pool_lock = threading.Lock()
         self.client_pool = 0
         self.current_global_state_dict = None
         self.snapshot = 1
@@ -200,19 +201,25 @@ class SimpleServer():
                         number_of_next_samples, new_global_state_dict = self.strategy.aggregate(state_dict, training_info)
                         
                         if number_of_next_samples is not None:
-                            self.client_pool += number_of_next_samples
+                            with self.client_pool_lock:
+                                self.client_pool += number_of_next_samples
                             self.current_global_state_dict = new_global_state_dict
                             
                 number_of_ready_clients = len(self.client_manager.get_all_ready_clients())
                 
-                if number_of_ready_clients > 0  and self.client_pool > 0:
+                with self.client_pool_lock:
+                    local_tasks_to_distribute = self.client_pool
+                
+                if number_of_ready_clients > 0  and local_tasks_to_distribute > 0:
                     selected_ready_clients = None
-                    if self.client_pool >= number_of_ready_clients:
-                        selected_ready_clients = self.client_manager.get_all_ready_clients()
-                        self.client_pool -= number_of_ready_clients
+                    if local_tasks_to_distribute >= number_of_ready_clients:
+                        selected_ready_clients = self.client_manager.sample_ready_clients(number_of_ready_clients)
+                        with self.client_pool_lock:
+                            self.client_pool -= number_of_ready_clients
                     else:
-                        selected_ready_clients = self.client_manager.sample_ready_clients(self.client_pool)
-                        self.client_pool = 0
+                        selected_ready_clients = self.client_manager.sample_ready_clients(local_tasks_to_distribute)
+                        with self.client_pool_lock:
+                            self.client_pool -= local_tasks_to_distribute
 
                     torch.save(self.current_global_state_dict, f'snapshot_{self.snapshot}.params')
                     self.s3_client.upload_file(
@@ -242,7 +249,7 @@ class SimpleServer():
                     self.task_producer.send_message(evaluator_message)
 
                     self.snapshot += 1
-        
+
         logging.info("Server stopped.")
         for client in self.client_manager.get_all_clients():
             logging.info(f"Sending disconnect message to client {client}...")
@@ -358,38 +365,47 @@ class SimpleServer():
             region_name=self.localstack_region_name
         )
         waiting_clients_to_be_ready = []
+        waiting_client_to_disconnect = []
         while True:
             results = message_consumer.consume_message(1000)
             if(results):
                 for entry in results :
                     message_type = entry.value.get('header').get('type')
                     client_id = entry.value.get('header').get('cid')
-                    
-                    if(message_type == MessageType.CONNECT) :
-                        initial_params_file = entry.value.get('payload')
-                        s3_client.download_file(self.localstack_bucket, initial_params_file, "init_" + client_id + ".params")
-                        state_dict = torch.load("init_" + client_id + ".params")
-                        if not isinstance(state_dict, OrderedDict):
-                            raise ValueError("The loaded state_dict is not an OrderedDict.")
-                        self.initial_params.append(state_dict)
-                        os.remove("init_" + client_id + ".params")
 
-                        logging.info(f"Client {client_id} connected.")
-                        self.client_manager.add_client(client_id)
+                    if client_id in self.client_manager.get_all_clients():
+                        if(message_type == MessageType.TASK) :
+                            waiting_clients_to_be_ready.append(client_id)
 
-                    elif(message_type == MessageType.TASK) :
-                        waiting_clients_to_be_ready.append(client_id)
+                        elif(message_type == MessageType.DISCONNECT) :
+                            logging.debug(f"Client {client_id} disconnected.")
+                            waiting_client_to_disconnect.append(client_id)
+                            with self.client_pool_lock:
+                                self.client_pool += 1
+                    else :
+                        if(message_type == MessageType.CONNECT) :
+                            initial_params_file = entry.value.get('payload')
+                            s3_client.download_file(self.localstack_bucket, initial_params_file, "init_" + client_id + ".params")
+                            state_dict = torch.load("init_" + client_id + ".params")
+                            if not isinstance(state_dict, OrderedDict):
+                                raise ValueError("The loaded state_dict is not an OrderedDict.")
+                            self.initial_params.append(state_dict)
+                            os.remove("init_" + client_id + ".params")
 
-                    elif(message_type == MessageType.DISCONNECT) :
-                        logging.debug(f"Client {client_id} disconnected.")
-                        self.client_manager.remove_client(client_id)
+                            logging.info(f"Client {client_id} connected.")
+                            self.client_manager.add_client(client_id)
 
             for client_id in waiting_clients_to_be_ready:
                 if self.client_manager.get_client_state(client_id) == ClientState.CONNECTED or self.client_manager.get_client_state(client_id) == ClientState.FINISHED:
                     logging.debug(f"Client {client_id} is ready for new task.")
                     self.client_manager.set_ready(client_id)
                     waiting_clients_to_be_ready.remove(client_id)
-            time.sleep(1)
+
+            for client_id in waiting_client_to_disconnect:
+                if self.client_manager.get_client_state(client_id) == ClientState.CONNECTED or self.client_manager.get_client_state(client_id) == ClientState.FINISHED:
+                    logging.debug(f"Client {client_id} is ready for disconnection.")
+                    self.client_manager.remove_client(client_id)
+                    waiting_client_to_disconnect.remove(client_id)
 
     def start_heartbeat_listener(self):
         heartbeat_consumer = None
@@ -445,5 +461,8 @@ class SimpleServer():
                 last_seen = self.client_manager.get_client_last_seen(client_id)
                 if time.time() - last_seen > 10:
                     logging.warning(f"Client {client_id} has not sent a heartbeat in a while. Last seen at {last_seen}.")
-                    self.client_manager.remove_client(client_id)
+                    with self.client_pool_lock:
+                        if self.client_manager.get_client_state(client_id) == ClientState.BUSY:
+                            self.client_pool += 1
+                        self.client_manager.remove_client(client_id)
             time.sleep(2)
