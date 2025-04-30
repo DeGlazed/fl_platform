@@ -5,3 +5,4 @@ tmp_*
 raw/
 *.pkl
 *venv*
+*.dat
