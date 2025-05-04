@@ -11,6 +11,7 @@ class FedFA(AbstractStrategy) :
                  ) :
         self.k = k
         self.queue = []
+        self.first_round = True
 
     def compute_new_global_model(self) -> OrderedDict:
         mean_params = OrderedDict()
@@ -37,5 +38,9 @@ class FedFA(AbstractStrategy) :
         
         logging.debug("Queue full, computing new global model")
         new_global_model = self.compute_new_global_model()
+        
+        if self.first_round:
+            self.first_round = False
+            return self.k, new_global_model
         
         return 1, new_global_model

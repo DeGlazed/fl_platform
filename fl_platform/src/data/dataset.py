@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Subset
 import numpy as np
 import pickle
 
@@ -89,6 +89,37 @@ class GeoLifeMobilityDataset(Dataset):
         bearing_rates = bearings_delta / time_deltas
         
         return np.stack([speeds, accelerations, bearings, bearings_delta, bearing_rates], axis=1)
+    
+def generate_indeces_split(total_data_len, num_clients, mean=None, std=None, seed=42):
+    np.random.seed(seed)
+    mean = mean or total_data_len / num_clients
+    std = std or total_data_len / (num_clients * 2)
+
+    random_normal_samples = np.random.normal(mean, std, num_clients)
+    non_negative_random_normal_samples = np.maximum(random_normal_samples, 1).astype(int)
+    normalized_samples = (non_negative_random_normal_samples / np.sum(non_negative_random_normal_samples) * total_data_len).astype(int)
+
+    if(normalized_samples.sum() != total_data_len):
+        diff = total_data_len - normalized_samples.sum()
+        random_index = np.random.randint(0, num_clients)
+        normalized_samples[random_index] += diff
+
+    randomized_data_idx = np.random.permutation(total_data_len)
+
+    data_split = []
+    start_index = 0
+    for sample in normalized_samples:
+        end_index = start_index + sample
+        data_split.append(randomized_data_idx[start_index:end_index])
+        start_index = end_index
+
+    return data_split
+
+def get_client_dataset_split_following_normal_distribution(client_idx, num_clients, dataset, mean=None, std=None, seed=42):
+    data_split = generate_indeces_split(len(dataset), num_clients, mean, std, seed)
+    client_data_indices = data_split[client_idx]
+    client_dataset = Subset(dataset, client_data_indices)
+    return client_dataset
 
 if __name__ == "__main__":
 
@@ -109,20 +140,12 @@ if __name__ == "__main__":
     label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
     print("Label Mapping:", label_mapping)
 
-    clients_subset=[1, 2]
-    
-    # dataset = GeoLifeMobilityDataset(geo_dataset, clients_subset, label_mapping)
-
-    # dataset = GeoLifeMobilityDataset(geo_dataset, clients_subset, label_mapping,
-    #     feature_extractor=GeoLifeMobilityDataset.delta_extractor
-    # )
+    clients_subset=range(1,65)
     
     dataset = GeoLifeMobilityDataset(geo_dataset, clients_subset, label_mapping,
         feature_extractor=GeoLifeMobilityDataset.rich_extractor
     )
 
-    for i in range(len(dataset)):
-        features, label = dataset[i]
-        print(f"Sample {i}: Features: {features}, Label: {label}")
-        if i == 5:
-            break
+    print("Dataset Size:", len(dataset))
+    client_dataset = get_client_dataset_split_following_normal_distribution(0, 5, dataset)
+    print("Client Dataset Size:", len(client_dataset))
