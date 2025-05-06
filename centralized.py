@@ -1,5 +1,5 @@
 from torch.utils.data import DataLoader
-from fl_platform.src.data.dataset import GeoLifeMobilityDataset
+from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution
 from fl_platform.src.models.model import SimpleLSTM
 import pickle
 import torch
@@ -13,8 +13,7 @@ def pad_collate(batch):
     padded = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
     return padded, torch.tensor(lengths), torch.tensor(labels)
 
-if __name__ == "__main__":
-
+def load_data(partition_id, num_partitions):
     with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
         geo_dataset = pickle.load(f)
     
@@ -38,31 +37,13 @@ if __name__ == "__main__":
     dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping,
         feature_extractor=GeoLifeMobilityDataset.rich_extractor
     )
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
+    client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
+    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
+    return dataloader, dataset
 
-    # Print total number of data samples in dataloader
-    total_samples = sum(len(batch[0]) for batch in dataloader)
-    print(f"Total number of data samples in dataloader: {total_samples}")
-
-    # Define Model
-    input_size = 5
-    hidden_size = 64
-    num_layers = 1
-    num_classes = len(dataset.label_mapping)
-
-    for sequences, lengths, labels in dataloader:
-        print(sequences.shape)  # should print: (batch_size, seq_len, 5)
-        break
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes).to(device)
-
-    # Loss and Optimizer
+def train(model, dataloader, num_epochs=10, lr=1e-3):
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
-    num_epochs = 20
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     for epoch in range(num_epochs):
         model.train()
@@ -103,3 +84,21 @@ if __name__ == "__main__":
 
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
 
+if __name__ == "__main__":
+
+    dataloader, dataset = load_data(0, 1)
+
+    # Print total number of data samples in dataloader
+    total_samples = sum(len(batch[0]) for batch in dataloader)
+    print(f"Total number of data samples in dataloader: {total_samples}")
+
+    # Define Model
+    input_size = 5
+    hidden_size = 64
+    num_layers = 1
+    num_classes = len(dataset.label_mapping)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes).to(device)
+
+    train(model, dataloader)

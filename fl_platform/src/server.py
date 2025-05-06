@@ -142,6 +142,7 @@ class SimpleServer():
                 sampled_params = random.choice(self.initial_params)
                 logging.debug(f"Sampling initial parameters. Choice is {sampled_params}...")
                 torch.save(sampled_params, 'snapshot_0.params')
+                self.current_global_state_dict = sampled_params
 
                 self.s3_client.upload_file(
                     'snapshot_0.params',

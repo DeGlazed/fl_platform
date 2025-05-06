@@ -428,13 +428,13 @@ class SimpleEvaluator():
         total = 0
 
         with torch.no_grad():
-            for data, target in self.test_loader:
-                output = self.model(data)
-                loss = nn.CrossEntropyLoss()(output, target)
+            for sequences, lengths, labels in self.test_loader:
+                outputs = self.model(sequences, lengths)
+                loss = nn.CrossEntropyLoss()(outputs, labels)
                 total_loss += loss.item()
-                _, predicted = torch.max(output.data, 1)
-                total += target.size(0)
-                correct += (predicted == target).sum().item()
+                _, predicted = outputs.max(1)
+                correct += predicted.eq(labels).sum().item()
+                total += labels.size(0)
 
         accuracy = 100 * correct / total
         return {"loss": total_loss / len(self.test_loader), "accuracy": accuracy}
