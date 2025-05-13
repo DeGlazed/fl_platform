@@ -6,3 +6,4 @@ raw/
 *.pkl
 *venv*
 *.dat
+30min_cProfile_test/

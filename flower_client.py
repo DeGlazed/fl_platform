@@ -5,6 +5,7 @@ from fl_platform.src.models.model import SimpleLSTM
 from collections import OrderedDict
 import torch
 import argparse
+import time
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -19,7 +20,7 @@ num_partitions = args.p + 1
 def set_parameters(model, params):
     params_dict = zip(model.state_dict().keys(), params)
     state_dict = OrderedDict({k: torch.tensor(v) for k,v in params_dict})
-    model.resnet.load_state_dict(state_dict, strict = True)
+    model.load_state_dict(state_dict, strict = True)
     return model
 
 dataloader, dataset = load_data(partition_id, num_partitions)
@@ -37,8 +38,17 @@ class FlowerClient(fl.client.NumPyClient) :
     
     def fit(self, parameters, config):
         set_parameters(net, parameters)
-        train(net, dataloader)
+
+        with open("c" + str(partition_id) + "_flower_work.txt", "a") as file:
+            file.write(f"{len(dataloader.dataset)}\n")
+
+        train(net, dataloader, num_epochs=5, lr=1e-3)
         return self.get_parameters({}), len(dataloader.dataset), {}
+
+    def evaluate(self, parameters, config):
+        set_parameters(net, parameters)
+        torch.save(net.state_dict(), f"{time.time()}_model.pt")
+        return 0.0, len(dataloader.dataset), {"accuracy": 0.0}
 
 if __name__ == "__main__" :
     fl.client.start_numpy_client(

@@ -5,6 +5,7 @@ import pickle
 import torch
 from torch import nn
 from tqdm import tqdm
+import os
 
 # collate function for padding
 def pad_collate(batch):
@@ -42,6 +43,8 @@ def load_data(partition_id, num_partitions):
     return dataloader, dataset
 
 def train(model, dataloader, num_epochs=10, lr=1e-3):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -84,13 +87,42 @@ def train(model, dataloader, num_epochs=10, lr=1e-3):
 
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
 
+def test(model, dataloader):
+
+    # Load model parameters from snapshots
+    snapshots_path = "30min_cProfile_test/sync/snapshots"
+    snapshot_files = sorted(os.listdir(snapshots_path))
+    print("Start test")
+    for snapshot_file in snapshot_files:
+        snapshot_path = os.path.join(snapshots_path, snapshot_file)
+        with open(snapshot_path, 'rb') as f:
+            state_dict = torch.load(f)
+            model.load_state_dict(state_dict)
+
+        # Evaluate the model on the dataloader
+        model.eval()
+        total_loss = 0
+        correct = 0
+        total = 0
+
+        with torch.no_grad():
+            for batch in dataloader:
+                sequences, lengths, labels = batch
+                sequences, lengths, labels = sequences.to(device), lengths.to(device), labels.to(device)
+
+                outputs = model(sequences, lengths)
+                loss = nn.CrossEntropyLoss()(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = outputs.max(1)
+                correct += predicted.eq(labels).sum().item()
+                total += labels.size(0)
+
+        accuracy = 100 * correct / total
+        print({"loss": total_loss / len(dataloader), "accuracy": accuracy})
+
 if __name__ == "__main__":
 
-    dataloader, dataset = load_data(0, 1)
-
-    # Print total number of data samples in dataloader
-    total_samples = sum(len(batch[0]) for batch in dataloader)
-    print(f"Total number of data samples in dataloader: {total_samples}")
+    dataloader, dataset = load_data(5, 6)
 
     # Define Model
     input_size = 5
@@ -101,4 +133,4 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes).to(device)
 
-    train(model, dataloader)
+    test(model, dataloader)

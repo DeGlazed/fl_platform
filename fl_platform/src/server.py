@@ -41,6 +41,7 @@ class SimpleServer():
         logging.basicConfig(level=logging.INFO)
         self.min_clients = min_clients
         self.strategy = strategy
+        self.initial_params_lock = threading.Lock()
         self.initial_params = []
         self.kafka_server = kafka_server
 
@@ -139,7 +140,8 @@ class SimpleServer():
                 if not self.initial_params:
                     raise ValueError("No initial parameters available to sample from.")
                 
-                sampled_params = random.choice(self.initial_params)
+                with self.initial_params_lock:
+                    sampled_params = random.choice(self.initial_params)
                 logging.debug(f"Sampling initial parameters. Choice is {sampled_params}...")
                 torch.save(sampled_params, 'snapshot_0.params')
                 self.current_global_state_dict = sampled_params
@@ -390,7 +392,8 @@ class SimpleServer():
                             state_dict = torch.load("init_" + client_id + ".params")
                             if not isinstance(state_dict, OrderedDict):
                                 raise ValueError("The loaded state_dict is not an OrderedDict.")
-                            self.initial_params.append(state_dict)
+                            with self.initial_params_lock:
+                                self.initial_params.append(state_dict)
                             os.remove("init_" + client_id + ".params")
 
                             logging.info(f"Client {client_id} connected.")
