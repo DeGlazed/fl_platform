@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  prometheus.yml: "global:\r\n  scrape_interval: 15s\r\n\r\nscrape_configs:\r\n  -
+    job_name: 'pushgateway'\r\n    static_configs:\r\n      - targets: ['pushgateway:9091']"
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: prometheus-config
+  namespace: default

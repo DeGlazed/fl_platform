@@ -1,8 +1,0 @@
-apiVersion: 1
-providers:
-  - name: 'Federated Learning Dashboards'
-    folder: 'fl_platform'
-    type: file
-    options:
-      path: /etc/grafana/provisioning/dashboards
-      updateIntervalSeconds: 30

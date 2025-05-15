@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+      - name: localstack
+        image: localstack/localstack:latest
+        ports:
+        - containerPort: 4566
+        - containerPort: 4571
+        env:
+        - name: SERVICES
+          value: s3,lambda,dynamodb,sqs,sns
+        - name: DEBUG
+          value: "1"
+        - name: DATA_DIR
+          value: /var/lib/localstack
+        - name: LAMBDA_EXECUTOR
+          value: docker-reuse
+        volumeMounts:
+        - name: localstack-data
+          mountPath: /var/lib/localstack
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+      volumes:
+      - name: localstack-data
+        persistentVolumeClaim:
+          claimName: localstack-pvc
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock

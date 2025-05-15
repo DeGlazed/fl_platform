@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  prometheus-datasource.yaml: "apiVersion: 1\r\ndatasources:\r\n  - name: Prometheus\r\n
+    \   type: prometheus\r\n    access: proxy\r\n    url: http://prometheus:9090\r\n
+    \   isDefault: true\r\n    editable: true\r\n    uid: prometheusdatasource"
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: grafana-datasources
+  namespace: default

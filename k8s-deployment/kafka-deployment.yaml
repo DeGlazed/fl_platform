@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+      - name: kafka
+        image: bitnami/kafka:latest
+        ports:
+        - containerPort: 9092  # PLAINTEXT
+        - containerPort: 9093  # CONTROLLER
+        - containerPort: 9094  # INTERNAL
+        - containerPort: 9095  # SSL
+        env:
+        - name: KAFKA_KRAFT_MODE
+          value: "true"
+        - name: KAFKA_CFG_NODE_ID
+          value: "1"
+        - name: KAFKA_CFG_PROCESS_ROLES
+          value: "broker,controller"
+        - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+          value: "1@localhost:9093"
+        - name: KAFKA_CFG_LISTENERS
+          value: "PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093,SSL://0.0.0.0:9095"
+        - name: KAFKA_CFG_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://192.168.49.2:30092,PLAINTEXT_INTERNAL://kafka:9094,SSL://localhost:30095"
+        - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+          value: "PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,SSL:SSL"
+        - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
+          value: "PLAINTEXT_INTERNAL"
+        - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+          value: "CONTROLLER"
+        - name: KAFKA_CFG_SSL_KEYSTORE_LOCATION
+          value: "/bitnami/kafka/config/certs/kafka.keystore.jks"
+        - name: KAFKA_CFG_SSL_KEYSTORE_PASSWORD
+          value: "password"
+        - name: KAFKA_CFG_SSL_KEY_PASSWORD
+          value: "password"
+        - name: KAFKA_CFG_SSL_TRUSTSTORE_LOCATION
+          value: "/bitnami/kafka/config/certs/kafka.truststore.jks"
+        - name: KAFKA_CFG_SSL_TRUSTSTORE_PASSWORD
+          value: "password"
+        volumeMounts:
+        - name: kafka-certs
+          mountPath: /bitnami/kafka/config/certs
+      volumes:
+      - name: kafka-certs
+        secret:
+          secretName: kafka-tls-secret
