@@ -312,7 +312,6 @@ class SimpleClient():
             time.sleep(2)
 
 class SimpleEvaluator():
-    
     def __init__(self,
                 model: nn.Module,
                 test_loader: torch.utils.data.DataLoader,
@@ -320,6 +319,7 @@ class SimpleEvaluator():
                 kafka_server: str,
                 model_topic: str,
                 #  result_topic: str,
+                pushgateway_server: str,
 
                 localstack_server: str,
                 localstack_bucket: str,
@@ -339,6 +339,7 @@ class SimpleEvaluator():
 
         self.kafka_server = kafka_server
         self.model_topic = model_topic
+        self.push_gateway_server = pushgateway_server
 
         self.localstack_server = localstack_server
         self.localstack_bucket = localstack_bucket
@@ -450,7 +451,7 @@ class SimpleEvaluator():
         # )
 
         response = requests.post(
-            f"http://localhost:9091/metrics/job/{client_id}",
+            self.push_gateway_server + f"/metrics/job/{client_id}",
             data=metrics.encode('utf-8')
         )
         print(f"{response.status_code} - {response.text}")

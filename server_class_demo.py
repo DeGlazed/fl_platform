@@ -3,14 +3,14 @@ from fl_platform.src.strategy.fed_fa import FedFA
 
 strategy = FedFA(k=3)  # Example strategy with k=5
 
-## for docker
+# for docker
 # kafka_server='localhost:9092', #PLAINTEXT
-# kafka_server='localhost:9095', #SSL
-# localstack_server='http://localhost:4566'
+kafka_server='localhost:9095', #SSL
+localstack_server='http://localhost:4566'
 
 ## for kubernetes
-kafka_server='localhost:30095', #SSL
-localstack_server='http://localhost:30566'
+# kafka_server='localhost:30095', #SSL
+# localstack_server='http://localhost:30566'
 
 server = SimpleServer(
     min_clients=3,

@@ -25,17 +25,25 @@ num_classes = len(dataset.label_mapping)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
 
+# for docker
+# kafka_server='localhost:9092', #PLAINTEXT
+kafka_server='localhost:9095', #SSL
+localstack_server='http://localhost:4566'
+
+## for kubernetes
+# kafka_server='localhost:30095', #SSL
+# localstack_server='http://localhost:30566'
+
 client = SimpleClient(
     model=model,
-    # kafka_server='localhost:9092', #PLAINTEXT
-    kafka_server='localhost:9095', #SSL
+    kafka_server=kafka_server,
     
     client_logs_topic='client-logs',
     local_models_topic='local-models',
     global_models_topic='global-models',
     client_heartbeat_topic='client-heartbeat',
     server_heartbeat_topic='server-heartbeat',
-    localstack_server='http://localhost:4566',
+    localstack_server=localstack_server,
     localstack_bucket='mybucket',
 
     ca_certificate_file_path='kafka-certs/ca-cert.pem',
@@ -52,8 +60,8 @@ while time.time() - start_time < 1800:
         print("Recv new model")
         print("Start training")
         
-        with open(client.cid + "_work.txt", "a") as file:
-            file.write(f"{len(dataloader.dataset)}\n")
+        # with open(client.cid + "_work.txt", "a") as file:
+        #     file.write(f"{len(dataloader.dataset)}\n")
 
         train(new_model, dataloader, num_epochs=5, lr=1e-3)
 
