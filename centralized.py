@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader
 from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution
-from fl_platform.src.models.model import SimpleLSTM
+from fl_platform.src.models.model import SimpleLSTM, ConvLSTM
 import pickle
 import torch
 from torch import nn
@@ -34,18 +34,19 @@ def load_data(partition_id, num_partitions):
 
     selected_clients = list(range(1, 65))
 
-    # dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping)
     dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping,
-        feature_extractor=GeoLifeMobilityDataset.rich_extractor
+        # feature_extractor=GeoLifeMobilityDataset.rich_extractor
     )
+
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
     dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
     return dataloader, dataset
 
 def train(model, dataloader, num_epochs=10, lr=1e-3):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Training on device:", device)
     model.to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     for epoch in range(num_epochs):
@@ -87,12 +88,10 @@ def train(model, dataloader, num_epochs=10, lr=1e-3):
 
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
 
-def test(model, dataloader):
-
-    # Load model parameters from snapshots
-    snapshots_path = "30min_cProfile_test/sync/snapshots"
+def test(model, dataloader, snapshots_path):
     snapshot_files = sorted(os.listdir(snapshots_path))
-    print("Start test")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Testing on device:", device)
     for snapshot_file in snapshot_files:
         snapshot_path = os.path.join(snapshots_path, snapshot_file)
         with open(snapshot_path, 'rb') as f:
@@ -100,6 +99,7 @@ def test(model, dataloader):
             model.load_state_dict(state_dict)
 
         # Evaluate the model on the dataloader
+        model.to(device)
         model.eval()
         total_loss = 0
         correct = 0
@@ -122,15 +122,20 @@ def test(model, dataloader):
 
 if __name__ == "__main__":
 
-    dataloader, dataset = load_data(5, 6)
+    dataloader, dataset = load_data(0, 1)
 
     # Define Model
-    input_size = 5
+    input_size = 3
+    # input_size = 5
     hidden_size = 64
     num_layers = 1
     num_classes = len(dataset.label_mapping)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes).to(device)
+    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
 
-    test(model, dataloader)
+    # conv_channels=32
+    # model = ConvLSTM(input_size, conv_channels, 7, 2, hidden_size, num_layers, num_classes)
+    train(model, dataloader)
+
+    # snapshots_path = "30min_cProfile_test/sync/snapshots"
+    # test(model, dataloader, snapshots_path)
