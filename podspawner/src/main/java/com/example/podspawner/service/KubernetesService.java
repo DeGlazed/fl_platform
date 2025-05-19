@@ -11,8 +11,11 @@ import io.kubernetes.client.openapi.models.V1PodSpec;
 import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
 import io.kubernetes.client.openapi.models.V1DeploymentBuilder;
 import io.kubernetes.client.openapi.models.V1DeploymentSpec;
+import io.kubernetes.client.openapi.models.V1EnvVar;
 import io.kubernetes.client.openapi.models.V1LabelSelector;
 import io.kubernetes.client.util.Config;
+
+import java.util.Arrays;
 import java.util.Collections;
 
 @Service
@@ -27,8 +30,8 @@ public class KubernetesService {
         AppsV1Api appsV1Api = new AppsV1Api(client);
 
         String namespace = "default";
-        String deploymentName = podName + "-deployment";
-        String imageName = "deglazed/test-frontend:latest";
+        String deploymentName = podName;
+        String imageName = "deglazed/server-demo:latest";
 
         V1DeploymentBuilder deploymentBuilder = new V1DeploymentBuilder()
                 .withApiVersion("apps/v1")
@@ -41,7 +44,11 @@ public class KubernetesService {
                                 .metadata(new V1ObjectMeta().putLabelsItem("name", deploymentName))
                                 .spec(new V1PodSpec()
                                         .containers(Collections.singletonList(
-                                                new V1Container().name(deploymentName).image(imageName))))));
+                                                new V1Container().name(deploymentName).image(imageName)
+                                                        .env(Arrays.asList(
+                                                                new V1EnvVar().name("KAFKA_SERVER").value("kafka:9095"),
+                                                                new V1EnvVar().name("LOCALSTACK_SERVER")
+                                                                        .value("http://localstack:4566"))))))));
 
         appsV1Api.createNamespacedDeployment(namespace, deploymentBuilder.build()).execute();
 

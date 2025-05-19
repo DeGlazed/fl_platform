@@ -26,11 +26,19 @@ keytool -keystore kafka.keystore.jks -alias kafka -certreq \
 <!-- keytool -keystore kafka.keystore.jks -alias kafka -certreq -file kafka.csr -storepass password -->
 
 ### Sign Kafka Cerificate
+#### Without san.conf
 ```
 openssl x509 -req -CA ca-cert.pem -CAkey ca-key.pem -in kafka.csr \
     -out kafka-cert-signed.pem -days 365 -CAcreateserial
 ```
 <!-- openssl x509 -req -CA ca-cert.pem -CAkey ca-key.pem -in kafka.csr -out kafka-cert-signed.pem -days 365 -CAcreateserial -->
+#### With san.conf (multiple hostnames allowed)
+```
+openssl x509 -req -CA ca-cert.pem -CAkey ca-key.pem -in kafka.csr \
+    -out kafka-cert-signed.pem -days 365 -CAcreateserial -extfile san.conf -extensions v3_req
+```
+
+<!-- openssl x509 -req -CA ca-cert.pem -CAkey ca-key.pem -in kafka.csr -out kafka-cert-signed.pem -days 365 -CAcreateserial -extfile san.conf -extensions v3_req -->
 
 ### Import CA in Kafka keystore
 ```

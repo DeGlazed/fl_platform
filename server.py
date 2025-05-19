@@ -5,10 +5,13 @@ import os
 strategy = FedFA(k=3)  # Example strategy with k=5
 
 # for kubernetes
-kafka_server = os.environ.get('KAFKA_SERVER')
-# kafka_server = os.environ.get('KAFKA_SERVER', 'kafka:30095')
-localstack_server = os.environ.get('LOCALSTACK_SERVER')
-# localstack_server = os.environ.get('LOCALSTACK_SERVER', 'http://localstack:30566')
+# kafka_server = os.getenv('KAFKA_SERVER')
+kafka_server = os.getenv('KAFKA_SERVER', 'kafka:30095')
+# localstack_server = os.getenv('LOCALSTACK_SERVER')
+localstack_server = os.getenv('LOCALSTACK_SERVER', 'http://localstack:30566')
+
+print(f'Kafka server: {kafka_server}')
+print(f'Localstack server: {localstack_server}')
 
 server = SimpleServer(
     min_clients=3,
