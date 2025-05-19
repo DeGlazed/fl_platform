@@ -1,1 +1,1 @@
-# Federatted Learning Platform for Human and Vehicle Mobility 
+# Federated Learning Platform for Human and Vehicle Mobility 
