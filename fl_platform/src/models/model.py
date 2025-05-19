@@ -21,7 +21,7 @@ class ConvLSTM(nn.Module):
             nn.ReLU(),
             nn.BatchNorm1d(extracted_features)
         )
-        self.lstm = nn.LSTM(extracted_features,hidden_size, num_layers, batch_first=True)
+        self.lstm = nn.LSTM(extracted_features, hidden_size, num_layers, batch_first=True)
         self.classifier = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x, lengths):

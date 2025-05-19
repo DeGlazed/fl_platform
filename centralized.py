@@ -131,10 +131,10 @@ if __name__ == "__main__":
     num_layers = 1
     num_classes = len(dataset.label_mapping)
 
-    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
 
-    # conv_channels=32
-    # model = ConvLSTM(input_size, conv_channels, 7, 2, hidden_size, num_layers, num_classes)
+    conv_channels=32
+    model = ConvLSTM(input_size, conv_channels, 5, 2, hidden_size, num_layers, num_classes)
     train(model, dataloader)
 
     # snapshots_path = "30min_cProfile_test/sync/snapshots"

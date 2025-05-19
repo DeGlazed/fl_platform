@@ -8,3 +8,4 @@ raw/
 *.dat
 30min_cProfile_test/
 *.exe
+venv

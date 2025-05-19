@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-frontend
+  template:
+    metadata:
+      labels:
+        app: test-frontend
+    spec:
+      containers:
+      - name: test-frontend
+        image: deglazed/test-frontend:latest  # Ensure the image is pushed or locally available
+        ports:
+        - containerPort: 5000
