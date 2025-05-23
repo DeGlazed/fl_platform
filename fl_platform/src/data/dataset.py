@@ -2,13 +2,14 @@ import torch
 from torch.utils.data import Dataset, Subset
 import numpy as np
 import pickle
+import pandas as pd
 
 class GeoLifeMobilityDataset(Dataset):
     def __init__(self, data_dict, clients_subset, label_mapping,
                  feature_extractor=None, min_length=10):
         self.samples = []
         self.label_mapping = label_mapping
-        self.feature_extractor = feature_extractor or self.location_time_extractor
+        self.feature_extractor = feature_extractor or self.default_data_extractor
         self.min_length = min_length
 
         for client_id in clients_subset:
@@ -30,6 +31,16 @@ class GeoLifeMobilityDataset(Dataset):
     def __getitem__(self, idx):
         features, label = self.samples[idx]
         return torch.tensor(features, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+
+    @staticmethod
+    def default_data_extractor(df):
+        coords = df[['latitude', 'longitude']].values
+        timestamps = df['timestamp'].astype('float').values
+
+        timestamps = timestamps.reshape(-1, 1)
+
+        features = np.hstack([coords, timestamps])
+        return features
 
     @staticmethod
     def location_time_extractor(df):
@@ -120,6 +131,50 @@ def get_client_dataset_split_following_normal_distribution(client_idx, num_clien
     client_data_indices = data_split[client_idx]
     client_dataset = Subset(dataset, client_data_indices)
     return client_dataset
+
+def latlon_to_cell(lat, lon, cell_size_m=500):
+    # Approx cell to fixed lat/lon grid
+    lat_cell = int(lat * 111000 / cell_size_m)
+    lon_cell = int(lon * 85000 / cell_size_m)
+    return (lat_cell, lon_cell)
+
+def get_client_quality_statistics(partition_id, num_partitions, label_mapping, default_data_extractor_dataset, spatial_granularity_m=500):
+    client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, default_data_extractor_dataset)
+    
+    labels = set()
+    spatial_cells = set()
+    time_slots = set()
+    sampling_regularity_stds = []
+    
+    for data_tensor, label_tensor in client_dataset:
+
+        label_name = [key for key, val in label_mapping.items() if val == label_tensor.item()][0]
+        labels.add(label_name)
+
+        # First two columns are lat, lon
+        coords = data_tensor[:, :2]
+        for lat, lon in coords:
+            spatial_cells.add(latlon_to_cell(lat.item(), lon.item(), spatial_granularity_m))
+
+        # Third column is timestamp
+        timestamps = data_tensor[:, 2]
+        for ts in timestamps:
+            ts_datetime = pd.to_datetime(ts.item(), unit='s')
+            time_slots.add((ts_datetime.hour, ts_datetime.weekday()))
+        
+        time_diffs = []
+        for i in range(1, len(timestamps)):
+            time_diffs.append(abs(timestamps[i].item() - timestamps[i-1].item()))
+        
+        std_dev = np.std(time_diffs)
+        sampling_regularity_stds.append(std_dev)
+
+    return {
+        "label_diversity": len(labels)/len(label_mapping),
+        "spatial_diversity": len(spatial_cells),
+        "temporal_diversity": len(time_slots),
+        "sampling_regularity_std": 1/(np.median(sampling_regularity_stds) + 1e-8)
+    }
 
 if __name__ == "__main__":
 

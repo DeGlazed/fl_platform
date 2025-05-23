@@ -175,18 +175,30 @@ class SimpleServer():
                 just_started = False
 
             else:
-                #Check stopping condition
-                if len(self.client_manager.get_all_clients()) < self.min_clients:
-                    logging.warning(f"Less than {self.min_clients} clients connected. Stopping server.")
+                # #Check stopping condition (less than min_clients)
+                # if len(self.client_manager.get_all_clients()) < self.min_clients:
+                #     logging.warning(f"Less than {self.min_clients} clients connected. Stopping server.")
+                #     self.server_stop.set()
+                #     break
+
+                #Check stopping condition (reached desired number of snapshots)
+                if self.snapshot > 10:
+                    logging.warning("Reached desired number of snapshots. Stopping server.")
                     self.server_stop.set()
                     break
+
 
                 result = self.local_consumer.consume_message(1000)
                 
                 if result:
                     for msg in result:
                         client_id = msg.value.get('header').get('cid')
+                        cli_timestamp = msg.value.get('header').get('timestamp')
                         training_info = msg.value.get('training_info')
+                        if training_info is None:
+                            training_info = {}
+                        training_info['client_id'] = client_id
+                        training_info['timestamp'] = cli_timestamp
                         params_file = msg.value.get('payload')
                         self.s3_client.download_file(self.localstack_bucket, params_file, params_file)
                         state_dict = torch.load(params_file)

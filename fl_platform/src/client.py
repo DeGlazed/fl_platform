@@ -90,7 +90,7 @@ class SimpleClient():
 
         init_state_dict = self.model.state_dict()
 
-        obj_name = "init_{self.cid}.pth"
+        obj_name = f"init_{self.cid}.pth"
         file_path = f"{self.tmp_dir}/" + obj_name
         torch.save(init_state_dict, file_path)
 

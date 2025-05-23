@@ -14,7 +14,7 @@ def pad_collate(batch):
     padded = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
     return padded, torch.tensor(lengths), torch.tensor(labels)
 
-def load_data(partition_id, num_partitions):
+def load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.rich_extractor):
     with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
         geo_dataset = pickle.load(f)
     
@@ -35,7 +35,7 @@ def load_data(partition_id, num_partitions):
     selected_clients = list(range(1, 65))
 
     dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping,
-        # feature_extractor=GeoLifeMobilityDataset.rich_extractor
+        feature_extractor=extractor
     )
 
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
@@ -125,16 +125,16 @@ if __name__ == "__main__":
     dataloader, dataset = load_data(0, 1)
 
     # Define Model
-    input_size = 3
-    # input_size = 5
+    # input_size = 3
+    input_size = 5
     hidden_size = 64
     num_layers = 1
     num_classes = len(dataset.label_mapping)
 
-    # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
 
-    conv_channels=32
-    model = ConvLSTM(input_size, conv_channels, 5, 2, hidden_size, num_layers, num_classes)
+    # conv_channels=32
+    # model = ConvLSTM(input_size, conv_channels, 5, 2, hidden_size, num_layers, num_classes)
     train(model, dataloader)
 
     # snapshots_path = "30min_cProfile_test/sync/snapshots"
