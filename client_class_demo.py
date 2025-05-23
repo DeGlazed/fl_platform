@@ -21,9 +21,10 @@ if(__name__ == "__main__"):
     partition_id = args.c
     num_partitions = args.p + 1
 
-    _ , geo_dataset = load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor)
-    stats = get_client_quality_statistics(partition_id, num_partitions, geo_dataset.label_mapping, geo_dataset)
-    print(stats)
+    stats = None
+    # _ , geo_dataset = load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor)
+    # stats = get_client_quality_statistics(partition_id, num_partitions, geo_dataset.label_mapping, geo_dataset)
+    # print(stats)
 
     dataloader, dataset = load_data(partition_id, num_partitions)
 
@@ -83,7 +84,8 @@ if(__name__ == "__main__"):
                 "learning_rate": lr
             }
 
-            training_info.update(stats)
+            if stats:
+                training_info.update(stats)
 
             client.publish_updated_model(new_model, training_info)
             print("Sent model")
