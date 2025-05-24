@@ -4,6 +4,105 @@ import numpy as np
 import pickle
 import pandas as pd
 
+class GeoLifeTrajectorySeqToSeqDataset(Dataset):
+    def __init__(self, data_dict, clients_subset,
+                 feature_extractor=None, min_length=10, sequence_length=5, prediction_length=5):
+        self.samples = []
+        self.feature_extractor = feature_extractor or self.default_data_extractor
+        self.min_length = min_length
+        self.sequence_length = sequence_length
+        self.prediction_length = prediction_length
+
+        for client_id in clients_subset:
+            user_data = data_dict.get(client_id, {})
+            for label_key, df in user_data.items():
+                if len(df) < min_length:
+                    continue
+
+                features = self.feature_extractor(df)
+                
+                for i in range(len(features) - sequence_length - prediction_length + 1):
+                    input_sequence = features[i:i+sequence_length]
+                    target_sequence = features[i+sequence_length:i+sequence_length+prediction_length][:, :2]
+                    self.samples.append((input_sequence, target_sequence))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        input_seq, target_seq = self.samples[idx]
+        return torch.tensor(input_seq, dtype=torch.float32), torch.tensor(target_seq, dtype=torch.float32)
+
+    @staticmethod
+    def default_data_extractor(df):
+        coords = df[['latitude', 'longitude']].values
+        timestamps = df['timestamp'].astype('float').values
+
+        timestamps = timestamps.reshape(-1, 1)
+
+        features = np.hstack([coords, timestamps])
+        return features
+
+    @staticmethod
+    def location_time_extractor(df):
+        coords = df[['latitude', 'longitude']].values
+        timestamps = df['timestamp'].astype('float').values
+
+        timestamps = timestamps - timestamps[0]
+        timestamps = timestamps.reshape(-1, 1)
+
+        features = np.hstack([coords, timestamps])
+        return features
+
+class GeoLifeTrajectoryNextPointDataset(Dataset):
+    def __init__(self, data_dict, clients_subset,
+                 feature_extractor=None, min_length=10, sequence_length=20):
+        self.samples = []
+        self.feature_extractor = feature_extractor or self.default_data_extractor
+        self.min_length = min_length
+        self.sequence_length = sequence_length
+
+        for client_id in clients_subset:
+            user_data = data_dict.get(client_id, {})
+            for label_key, df in user_data.items():
+                if len(df) < min_length:
+                    continue
+
+                features = self.feature_extractor(df)
+                
+                for i in range(len(features) - sequence_length):
+                    input_sequence = features[i:i+sequence_length]
+                    target_point = features[i+sequence_length][:2]
+                    self.samples.append((input_sequence, target_point))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        sequence, target = self.samples[idx]
+        return torch.tensor(sequence, dtype=torch.float32), torch.tensor(target, dtype=torch.float32)
+
+    @staticmethod
+    def default_data_extractor(df):
+        coords = df[['latitude', 'longitude']].values
+        timestamps = df['timestamp'].astype('float').values
+
+        timestamps = timestamps.reshape(-1, 1)
+
+        features = np.hstack([coords, timestamps])
+        return features
+
+    @staticmethod
+    def location_time_extractor(df):
+        coords = df[['latitude', 'longitude']].values
+        timestamps = df['timestamp'].astype('float').values
+
+        timestamps = timestamps - timestamps[0]
+        timestamps = timestamps.reshape(-1, 1)
+
+        features = np.hstack([coords, timestamps])
+        return features
+
 class GeoLifeMobilityDataset(Dataset):
     def __init__(self, data_dict, clients_subset, label_mapping,
                  feature_extractor=None, min_length=10):
@@ -178,7 +277,10 @@ def get_client_quality_statistics(partition_id, num_partitions, label_mapping, d
 
 if __name__ == "__main__":
 
-    with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
+    # with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
+    #     geo_dataset = pickle.load(f)
+
+    with open('fl_platform\src\data\processed\geolife_next_point_separated_routes.pkl', 'rb') as f:
         geo_dataset = pickle.load(f)
     
     filter_geo_dataset = {}
@@ -193,14 +295,21 @@ if __name__ == "__main__":
     labels = ['walk', 'bus', 'car', 'taxi', 'subway', 'train', 'bike'] #removed 'run' and 'motorcycle'
     sorted_labels = sorted(labels)
     label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
-    print("Label Mapping:", label_mapping)
+    # print("Label Mapping:", label_mapping)
 
     clients_subset=range(1,65)
     
-    dataset = GeoLifeMobilityDataset(geo_dataset, clients_subset, label_mapping,
-        feature_extractor=GeoLifeMobilityDataset.rich_extractor
-    )
+    # dataset = GeoLifeMobilityDataset(geo_dataset, clients_subset, label_mapping,
+    #     feature_extractor=GeoLifeMobilityDataset.rich_extractor
+    # )
+
+    dataset = GeoLifeTrajectoryNextPointDataset(geo_dataset, clients_subset)
 
     print("Dataset Size:", len(dataset))
+    print("Sample Data:", dataset[0])
+    print("Sample Data Shape:", dataset[0][0].shape)
+
     client_dataset = get_client_dataset_split_following_normal_distribution(0, 5, dataset)
     print("Client Dataset Size:", len(client_dataset))
+    print("Sample Data:", client_dataset[0])
+    print("Sample Data Shape:", client_dataset[0][0].shape)

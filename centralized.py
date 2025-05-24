@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader
-from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution
-from fl_platform.src.models.model import SimpleLSTM, ConvLSTM
+from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution, GeoLifeTrajectoryNextPointDataset, GeoLifeTrajectorySeqToSeqDataset
+from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, NextLocationLSTM, NextSequenceLSTM
 import pickle
 import torch
 from torch import nn
@@ -13,6 +13,21 @@ def pad_collate(batch):
     lengths = [len(seq) for seq in sequences]
     padded = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
     return padded, torch.tensor(lengths), torch.tensor(labels)
+
+def pad_collate_next_point(batch):
+    sequences, targets = zip(*batch)
+    lengths = [len(seq) for seq in sequences]
+    padded_seq = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
+    targets_tensor = torch.stack([torch.tensor(target, dtype=torch.float32) for target in targets])
+    return padded_seq, torch.tensor(lengths), targets_tensor
+
+def pad_collate_next_sequence(batch):
+    sequences, targets = zip(*batch)
+    input_lengths = [len(seq) for seq in sequences]
+    target_lengths = [len(target) for target in targets]
+    padded_sequences = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
+    padded_targets = torch.nn.utils.rnn.pad_sequence(targets, batch_first=True)
+    return (padded_sequences, torch.tensor(input_lengths), padded_targets, torch.tensor(target_lengths))
 
 def load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.rich_extractor):
     with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
@@ -40,6 +55,34 @@ def load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.ric
 
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
     dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
+    return dataloader, dataset
+
+def load_next_point_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor):
+    with open('fl_platform\src\data\processed\geolife_next_point_separated_routes.pkl', 'rb') as f:
+        geo_dataset = pickle.load(f)
+
+    selected_clients = list(range(1, 65))
+
+    dataset = GeoLifeTrajectoryNextPointDataset(geo_dataset, selected_clients,
+        feature_extractor=extractor
+    )
+
+    client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
+    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate_next_point)
+    return dataloader, dataset
+
+def load_next_sequence_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor):
+    with open('fl_platform\src\data\processed\geolife_next_point_separated_routes.pkl', 'rb') as f:
+        geo_dataset = pickle.load(f)
+
+    selected_clients = list(range(1, 65))
+
+    dataset = GeoLifeTrajectorySeqToSeqDataset(geo_dataset, selected_clients,
+        feature_extractor=extractor
+    )
+
+    client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
+    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate_next_sequence)
     return dataloader, dataset
 
 def train(model, dataloader, num_epochs=10, lr=1e-3):
@@ -88,6 +131,82 @@ def train(model, dataloader, num_epochs=10, lr=1e-3):
 
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
 
+def train_next_point(model, dataloader, num_epochs=10, lr=1e-3):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Training on device:", device)
+    model.to(device)
+    criterion = nn.MSELoss().to(device)  # Changed to MSE for regression
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    for epoch in range(num_epochs):
+        model.train()
+        total_loss = 0
+
+        print(f"\nEpoch {epoch+1}/{num_epochs}")
+
+        progress_bar = tqdm(dataloader, desc="Training", leave=True)
+
+        for batch in progress_bar:
+            sequences, lengths, targets = batch
+            sequences, lengths, targets = sequences.to(device), lengths.to(device), targets.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(sequences, lengths)
+
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+
+            batch_loss = loss.item()
+            total_loss += batch_loss
+
+            # Update tqdm description dynamically
+            progress_bar.set_postfix({
+                "batch_loss": f"{batch_loss:.4f}"
+            })
+
+        epoch_loss = total_loss / len(dataloader)
+
+        print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
+
+def train_seq_to_seq(model, dataloader, num_epochs=10, lr=1e-3):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Training on device:", device)
+    model.to(device)
+    criterion = nn.MSELoss().to(device)  # Changed to MSE for regression
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    for epoch in range(num_epochs):
+        model.train()
+        total_loss = 0
+
+        print(f"\nEpoch {epoch+1}/{num_epochs}")
+
+        progress_bar = tqdm(dataloader, desc="Training", leave=True)
+
+        for batch in progress_bar:
+            sequences, input_lengths, targets, target_lengths = batch
+            sequences, input_lengths, targets, target_lengths = sequences.to(device), input_lengths.to(device), targets.to(device), target_lengths.to(device)
+
+            optimizer.zero_grad()
+
+            outputs = model(sequences, input_lengths, targets)
+
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+
+            batch_loss = loss.item()
+            total_loss += batch_loss
+
+            # Update tqdm description dynamically
+            progress_bar.set_postfix({
+                "batch_loss": f"{batch_loss:.4f}"
+            })
+
+        epoch_loss = total_loss / len(dataloader)
+        print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
+
 def test(model, dataloader, snapshots_path):
     snapshot_files = sorted(os.listdir(snapshots_path))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -122,20 +241,35 @@ def test(model, dataloader, snapshots_path):
 
 if __name__ == "__main__":
 
-    dataloader, dataset = load_data(0, 1)
+    # dataloader, dataset = load_data(0, 1)
 
-    # Define Model
-    # input_size = 3
-    input_size = 5
-    hidden_size = 64
-    num_layers = 1
-    num_classes = len(dataset.label_mapping)
+    # # Define Model
+    # # input_size = 3
+    # input_size = 5
+    # hidden_size = 64
+    # num_layers = 1
+    # num_classes = len(dataset.label_mapping)
 
-    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
 
-    # conv_channels=32
-    # model = ConvLSTM(input_size, conv_channels, 5, 2, hidden_size, num_layers, num_classes)
-    train(model, dataloader)
+    # # conv_channels=32
+    # # model = ConvLSTM(input_size, conv_channels, 5, 2, hidden_size, num_layers, num_classes)
+    # train(model, dataloader)
 
-    # snapshots_path = "30min_cProfile_test/sync/snapshots"
-    # test(model, dataloader, snapshots_path)
+    # # snapshots_path = "30min_cProfile_test/sync/snapshots"
+    # # test(model, dataloader, snapshots_path)
+
+
+
+
+    # dataloader, dataset = load_next_point_data(0, 100)
+
+    # model = NextLocationLSTM(input_size=3, hidden_size=64, num_layers=1)
+
+    # train_next_point(model, dataloader)
+
+
+
+    dataloader, dataset = load_next_sequence_data(0, 10)
+    model = NextSequenceLSTM()
+    train_seq_to_seq(model, dataloader)
