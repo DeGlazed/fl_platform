@@ -24,7 +24,6 @@ if(__name__ == "__main__"):
     stats = None
     # _ , geo_dataset = load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor)
     # stats = get_client_quality_statistics(partition_id, num_partitions, geo_dataset.label_mapping, geo_dataset)
-    # print(stats)
 
     dataloader, dataset = load_data(partition_id, num_partitions)
 
@@ -71,9 +70,7 @@ if(__name__ == "__main__"):
             print("Recv new model")
             print("Start training")
             
-            # with open(client.cid + "_work.txt", "a") as file:
-            #     file.write(f"{len(dataloader.dataset)}\n")
-            num_epochs = 5
+            num_epochs = 10
             lr = 1e-3
             train(new_model, dataloader, num_epochs=num_epochs, lr=lr)
 
