@@ -70,12 +70,15 @@ class SimpleServer():
         self.client_pool_lock = threading.Lock()
         self.client_pool = 0
         self.current_global_state_dict = None
+        self.current_global_timestamp = None
         self.snapshot = 1
 
         self.ssl_context = None
         if self.ca_certificate_file_path and self.certificate_file_path and self.key_file_path:
             self.ssl_context = ssl.create_default_context(cafile=self.ca_certificate_file_path)
             self.ssl_context.load_cert_chain(certfile=self.certificate_file_path, keyfile=self.key_file_path)
+
+        self.client_models_timestamps = {}
 
     def start_server(self):
         setup_server_successful = self.setup_server()
@@ -146,6 +149,8 @@ class SimpleServer():
                 torch.save(sampled_params, 'snapshot_0.params')
                 self.current_global_state_dict = sampled_params
 
+                init_model_params_timestamp = time.time()
+
                 self.s3_client.upload_file(
                     'snapshot_0.params',
                     self.localstack_bucket,
@@ -155,6 +160,7 @@ class SimpleServer():
 
                 for client_id in clinet_ids:
                     logging.debug(f"Sending initial parameters to client {client_id}...")
+                    self.client_models_timestamps[client_id] = init_model_params_timestamp
                     task_message = Message(
                                             cid=client_id,
                                             type=MessageType.TASK,
@@ -182,7 +188,7 @@ class SimpleServer():
                 #     break
 
                 #Check stopping condition (reached desired number of snapshots)
-                if self.snapshot > 10:
+                if self.snapshot > 50:
                     logging.warning("Reached desired number of snapshots. Stopping server.")
                     self.server_stop.set()
                     break
@@ -193,12 +199,11 @@ class SimpleServer():
                 if result:
                     for msg in result:
                         client_id = msg.value.get('header').get('cid')
-                        cli_timestamp = msg.value.get('header').get('timestamp')
                         training_info = msg.value.get('training_info')
                         if training_info is None:
                             training_info = {}
                         training_info['client_id'] = client_id
-                        training_info['timestamp'] = cli_timestamp
+                        training_info['timestamp'] = self.client_models_timestamps.get(client_id)
                         params_file = msg.value.get('payload')
                         self.s3_client.download_file(self.localstack_bucket, params_file, params_file)
                         state_dict = torch.load(params_file)
@@ -219,6 +224,7 @@ class SimpleServer():
                             with self.client_pool_lock:
                                 self.client_pool += number_of_next_samples
                             self.current_global_state_dict = new_global_state_dict
+                            self.current_global_timestamp = time.time()
                             
                 number_of_ready_clients = len(self.client_manager.get_all_ready_clients())
                 
@@ -254,6 +260,7 @@ class SimpleServer():
                         )
                         self.task_producer.send_message(task_message)
                         self.client_manager.set_busy(client)
+                        self.client_models_timestamps[client] = self.current_global_timestamp
                     
                     evaluator_message = Message(
                         cid=None,

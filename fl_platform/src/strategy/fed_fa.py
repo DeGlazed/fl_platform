@@ -102,17 +102,23 @@ class TimestampSizeAwareFedFA(AbstractStrategy):
 
     def compute_new_global_model(self) -> OrderedDict:
         mean_params = OrderedDict()
-
-        current_time = max([float(info['timestamp']) for info in self.info_queue])
         
         total_weighted_samples = 0
         weights = []
-        for info in self.info_queue:
-            time_weight = self.decay_factor ** (current_time - float(info['timestamp']))
-            sample_weight = info['num_samples']
-            combined_weight = time_weight * sample_weight
-            weights.append(combined_weight)
-            total_weighted_samples += combined_weight
+
+        timestamps = [float(info['timestamp']) for info in self.info_queue]
+        sample_sizes = [info['num_samples'] for info in self.info_queue]
+
+        timestamp_min, timestamp_max = min(timestamps), max(timestamps)
+        sample_min, sample_max = min(sample_sizes), max(sample_sizes)
+
+        norm_timestamps = [(t - timestamp_min) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
+        norm_samples = [(s - sample_min) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
+        
+        for i in range(len(norm_timestamps)):
+            weighted_avg = 0.5*norm_timestamps[i] + 0.5*norm_samples[i]
+            weights.append(weighted_avg)
+            total_weighted_samples += weighted_avg
         
         # Normalize weights
         weights = [w / total_weighted_samples for w in weights]
@@ -161,7 +167,7 @@ class DataQualityAwareFedFA(AbstractStrategy):
 
     def compute_new_global_model(self) -> OrderedDict:
         mean_params = OrderedDict()
-        current_time = max([float(info['timestamp']) for info in self.info_queue])
+        max_time = max([float(info['timestamp']) for info in self.info_queue])
         
         quality_columns = ['label_diversity', 'spatial_diversity', 'temporal_diversity', 'sampling_regularity_std']
         quality_data = {}
@@ -177,14 +183,22 @@ class DataQualityAwareFedFA(AbstractStrategy):
 
         total_weighted_samples = 0
         weights = []
-        for i, info in enumerate(self.info_queue):
-            time_weight = self.decay_factor ** (current_time - float(info['timestamp']))
-            sample_weight = info['num_samples']
-            quality_weight = df["score"].iloc[i]
 
-            combined_weight = time_weight * sample_weight * quality_weight
-            weights.append(combined_weight)
-            total_weighted_samples += combined_weight
+        timestamps = [float(info['timestamp']) for info in self.info_queue]
+        sample_sizes = [info['num_samples'] for info in self.info_queue]
+
+        timestamp_min, timestamp_max = min(timestamps), max(timestamps)
+        sample_min, sample_max = min(sample_sizes), max(sample_sizes)
+
+        norm_timestamps = [(t - timestamp_min) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
+        norm_samples = [(s - sample_min) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
+        
+        quality_weights = [df["score"].iloc[i] for i in range(len(self.info_queue))]
+        
+        for i in range(len(norm_timestamps)):
+            weighted_avg = 0.33*norm_timestamps[i] + 0.33*norm_samples[i] + 0.33*quality_weights[i]
+            weights.append(weighted_avg)
+            total_weighted_samples += weighted_avg
         
         # Normalize weights
         weights = [w / total_weighted_samples for w in weights]

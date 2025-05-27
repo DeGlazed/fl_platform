@@ -1,9 +1,9 @@
 from fl_platform.src.server import SimpleServer
 from fl_platform.src.strategy.fed_fa import NaiveFedFA, SampleSizeAwareFedFA, TimestampSizeAwareFedFA, DataQualityAwareFedFA
 
-strategy = NaiveFedFA(k=3)
+# strategy = NaiveFedFA(k=3)
 # strategy = SampleSizeAwareFedFA(k=3)
-# strategy = TimestampSizeAwareFedFA(k=3)
+strategy = TimestampSizeAwareFedFA(k=3)
 # strategy = DataQualityAwareFedFA(k=3)
 
 

@@ -9,3 +9,4 @@ raw/
 30min_cProfile_test/
 *.exe
 venv
+*.log

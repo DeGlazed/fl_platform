@@ -4,6 +4,7 @@ import argparse
 import torch
 import time
 import numpy as np
+import pandas as pd
 
 from centralized import load_data, train
 from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_quality_statistics
@@ -22,8 +23,8 @@ if(__name__ == "__main__"):
     num_partitions = args.p + 1
 
     stats = None
-    # _ , geo_dataset = load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor)
-    # stats = get_client_quality_statistics(partition_id, num_partitions, geo_dataset.label_mapping, geo_dataset)
+    _ , geo_dataset = load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor)
+    stats = get_client_quality_statistics(partition_id, num_partitions, geo_dataset.label_mapping, geo_dataset)
 
     dataloader, dataset = load_data(partition_id, num_partitions)
 

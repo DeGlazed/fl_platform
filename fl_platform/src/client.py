@@ -333,7 +333,9 @@ class SimpleEvaluator():
                 key_file_path : str = None,
                 ):
         
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(
+            filename='eval.log',                
+            level=logging.INFO)
         self.model = model
         self.test_loader = test_loader
 
