@@ -4,6 +4,7 @@ from fl_platform.src.models.model import SimpleLSTM
 from torch.utils.data import DataLoader
 import pickle
 import torch
+from centralized import load_train_test_data
 
 def pad_collate(batch):
     sequences, labels = zip(*batch)
@@ -28,15 +29,18 @@ sorted_labels = sorted(labels)
 label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
 selected_clients = list(range(1, 65))
 
-dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping,
-    feature_extractor=GeoLifeMobilityDataset.rich_extractor
-)
-client_dataset = get_client_dataset_split_following_normal_distribution(5, 6, dataset)
-dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
+# dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping,
+#     feature_extractor=GeoLifeMobilityDataset.rich_extractor
+# )
+# dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
+
+_, dataloader, dataset = load_train_test_data(0, 1)
+
+# dataloader = None
 
 input_size = 5
 hidden_size = 64
-num_layers = 1
+num_layers = 2
 num_classes = len(dataset.label_mapping)
 model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
 

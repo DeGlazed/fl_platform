@@ -38,7 +38,10 @@ class SimpleServer():
                 key_file_path : str = None,
                 ):
         
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(
+            filename='server.log',  
+            level=logging.INFO)
+        
         self.min_clients = min_clients
         self.strategy = strategy
         self.initial_params_lock = threading.Lock()
@@ -132,7 +135,7 @@ class SimpleServer():
         while not self.server_stop.is_set():
             if just_started:
                 while len(self.client_manager.get_all_ready_clients()) < self.min_clients:
-                    logging.info(f"Waiting for {self.min_clients - len(self.client_manager.get_all_ready_clients())} more clients to be ready...")
+                    # logging.info(f"Waiting for {self.min_clients - len(self.client_manager.get_all_ready_clients())} more clients to be ready...")
                     time.sleep(1)
 
                 init_samples = self.strategy.get_number_of_initial_client_samples()
@@ -188,7 +191,7 @@ class SimpleServer():
                 #     break
 
                 #Check stopping condition (reached desired number of snapshots)
-                if self.snapshot > 50:
+                if self.snapshot > 500:
                     logging.warning("Reached desired number of snapshots. Stopping server.")
                     self.server_stop.set()
                     break
@@ -219,6 +222,10 @@ class SimpleServer():
                         logging.info(f"Received local parameters from client {client_id}.")
                         self.client_manager.set_finished(client_id)
                         number_of_next_samples, new_global_state_dict = self.strategy.aggregate(state_dict, training_info)
+
+                        result = self.strategy.evaluate()
+                        if result:
+                            logging.info(f"Async evaluation aggregation result: {result}")
                         
                         if number_of_next_samples is not None:
                             with self.client_pool_lock:

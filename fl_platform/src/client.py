@@ -358,6 +358,8 @@ class SimpleEvaluator():
         if self.ca_certificate_file_path and self.certificate_file_path and self.key_file_path:
             self.ssl_context = ssl.create_default_context(cafile=self.ca_certificate_file_path)
             self.ssl_context.load_cert_chain(certfile=self.certificate_file_path, keyfile=self.key_file_path)
+        
+        self.model_version = 0
 
         self.setup_evaluator()
 
@@ -414,15 +416,25 @@ class SimpleEvaluator():
                         self.model.load_state_dict(state_dict, strict=True)
                         os.remove(local_file)
 
-                        result = self.evaluate()
-                        self.push_metrics(
-                            model_id="demo",
-                            client_id=self.cid,
-                            accuracy=result["accuracy"],
-                            loss=result["loss"],
-                            round_id=int(float(msg.value.get('header').get('timestamp')))
-                        )
-                        logging.info(f"Evaluation result for {local_file}: {result}")
+                        if self.test_loader is None:
+                            torch.save(self.model.state_dict(), f"model_results/model_{self.model_version}.pth")
+                            self.model_version += 1
+                            logging.info("Model state dict saved to file (no test loader provided)")
+                        
+                        else :
+                            torch.save(self.model.state_dict(), f"model_results/model_{self.model_version}.pth")
+                            self.model_version += 1
+                            logging.info("Model state dict saved to file")
+                            
+                            result = self.evaluate()
+                            self.push_metrics(
+                                model_id="demo",
+                                client_id=self.cid,
+                                accuracy=result["accuracy"],
+                                loss=result["loss"],
+                                round_id=int(float(msg.value.get('header').get('timestamp')))
+                            )
+                            logging.info(f"Evaluation result for {local_file}: {result}")
 
     def evaluate(self) -> dict:
         self.model.eval()

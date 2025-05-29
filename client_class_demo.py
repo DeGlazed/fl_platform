@@ -6,12 +6,18 @@ import time
 import numpy as np
 import pandas as pd
 
-from centralized import load_data, train
+from centralized import load_data, train, validate, load_train_test_data
 from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_quality_statistics
 
 torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 np.random.seed(42)
+
+def pad_collate(batch):
+    sequences, labels = zip(*batch)
+    lengths = [len(seq) for seq in sequences]
+    padded = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
+    return padded, torch.tensor(lengths), torch.tensor(labels)
 
 if(__name__ == "__main__"):
     parser = argparse.ArgumentParser(description='FL Client')
@@ -20,17 +26,18 @@ if(__name__ == "__main__"):
 
     args = parser.parse_args()
     partition_id = args.c
-    num_partitions = args.p + 1
+    # num_partitions = args.p + 1
+    num_partitions = args.p
 
+    dataloader, _, dataset = load_train_test_data(partition_id, num_partitions)
     stats = None
     _ , geo_dataset = load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor)
     stats = get_client_quality_statistics(partition_id, num_partitions, geo_dataset.label_mapping, geo_dataset)
 
-    dataloader, dataset = load_data(partition_id, num_partitions)
-
     input_size = 5
     hidden_size = 64
-    num_layers = 1
+    # num_layers = 1
+    num_layers = 2
     num_classes = len(dataset.label_mapping)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -70,16 +77,40 @@ if(__name__ == "__main__"):
         if new_model:
             print("Recv new model")
             print("Start training")
+
+            # Split dataloader into train and validation sets (80-20)
+            dataset_size = len(dataloader.dataset)
+            train_size = int(0.8 * dataset_size)
+            val_size = dataset_size - train_size
+
+            train_dataset, val_dataset = torch.utils.data.random_split(dataloader.dataset, [train_size, val_size])
+
+            train_dataloader = torch.utils.data.DataLoader(
+                train_dataset, 
+                batch_size=dataloader.batch_size, 
+                shuffle=True,
+                collate_fn=pad_collate
+            )
+            val_dataloader = torch.utils.data.DataLoader(
+                val_dataset, 
+                batch_size=dataloader.batch_size, 
+                shuffle=False,
+                collate_fn=pad_collate
+            )
             
             num_epochs = 10
             lr = 1e-3
             train(new_model, dataloader, num_epochs=num_epochs, lr=lr)
 
+            loss, acc = validate(new_model, val_dataloader)
+
             training_info = {
                 "num_samples": len(dataloader.dataset),
                 "num_epochs": num_epochs,
                 "batch_size": 32,
-                "learning_rate": lr
+                "learning_rate": lr,
+                "loss": loss,
+                "accuracy": acc,
             }
 
             if stats:

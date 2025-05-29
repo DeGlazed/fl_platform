@@ -10,3 +10,6 @@ class AbstractStrategy() :
     
     def aggregate(self, local_model: List) -> List:
         raise NotImplementedError("aggregate() must be implemented in the subclass")
+
+    def evaluate(self) -> dict:
+        return None

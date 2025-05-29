@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from tqdm import tqdm
 import os
+import numpy as np
 
 # collate function for padding
 def pad_collate(batch):
@@ -57,6 +58,43 @@ def load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.ric
     dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
     return dataloader, dataset
 
+def load_train_test_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.rich_extractor):
+    torch.manual_seed(42)
+    torch.cuda.manual_seed(42)
+    np.random.seed(42)
+    
+    with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
+        geo_dataset = pickle.load(f)
+    
+    filter_geo_dataset = {}
+    for client_id, data in geo_dataset.items():
+        filtered_data_dict = {}
+        for lable, df in data.items():
+            if 'run' not in lable and 'motorcycle' not in lable:
+                filtered_data_dict[lable] = df
+        filter_geo_dataset[client_id] = filtered_data_dict
+    geo_dataset = filter_geo_dataset
+
+    labels = ['walk', 'bus', 'car', 'taxi', 'subway', 'train', 'bike'] #removed 'run' and 'motorcycle'
+    sorted_labels = sorted(labels)
+    label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
+
+    selected_clients = list(range(1, 65))
+
+    dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping,
+        feature_extractor=extractor
+    )
+    num_samples = len(dataset)
+    train_size = int(0.8 * num_samples)
+    test_size = num_samples - train_size
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+    client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, train_dataset)
+    train_dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
+    test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, collate_fn=pad_collate)
+    
+    return train_dataloader, test_dataloader, dataset
+
 def load_next_point_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor):
     with open('fl_platform\src\data\processed\geolife_next_point_separated_routes.pkl', 'rb') as f:
         geo_dataset = pickle.load(f)
@@ -85,7 +123,10 @@ def load_next_sequence_data(partition_id, num_partitions, extractor=GeoLifeMobil
     dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate_next_sequence)
     return dataloader, dataset
 
-def train(model, dataloader, num_epochs=10, lr=1e-3):
+def train(model, dataloader, num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots"):
+    if save_snapshots and not os.path.exists(snapshots_path):
+        os.makedirs(snapshots_path)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on device:", device)
     model.to(device)
@@ -128,6 +169,14 @@ def train(model, dataloader, num_epochs=10, lr=1e-3):
 
         epoch_loss = total_loss / len(dataloader)
         epoch_acc = correct / total
+
+        if save_snapshots:
+            snapshot_path = os.path.join(snapshots_path, f"epoch_{epoch+1}.pth")
+            with open(snapshot_path, 'wb') as f:
+                torch.save(model.state_dict(), f)
+            logs_path = os.path.join(snapshots_path, "rounds.log")
+            with open(logs_path, 'a') as f:
+                f.write(f"Epoch {epoch+1}: Loss={epoch_loss:.4f}, Accuracy={epoch_acc:.4f}\n")
 
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
 
@@ -207,6 +256,32 @@ def train_seq_to_seq(model, dataloader, num_epochs=10, lr=1e-3):
         epoch_loss = total_loss / len(dataloader)
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
 
+def validate(model, dataloader):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Testing on device:", device)
+    model.to(device)
+    model.eval()
+    total_loss = 0
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for batch in dataloader:
+            sequences, lengths, labels = batch
+            sequences, lengths, labels = sequences.to(device), lengths.to(device), labels.to(device)
+
+            outputs = model(sequences, lengths)
+            loss = nn.CrossEntropyLoss()(outputs, labels)
+            total_loss += loss.item()
+            _, predicted = outputs.max(1)
+            correct += predicted.eq(labels).sum().item()
+            total += labels.size(0)
+
+    accuracy = 100 * correct / total
+    loss = total_loss / len(dataloader)
+    print(f"Validation Loss: {loss:.4f}, Accuracy: {accuracy:.2f}%")
+    return loss, accuracy
+
 def test(model, dataloader, snapshots_path):
     snapshot_files = sorted(os.listdir(snapshots_path))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -270,6 +345,20 @@ if __name__ == "__main__":
 
 
 
-    dataloader, dataset = load_next_sequence_data(0, 10)
-    model = NextSequenceLSTM()
-    train_seq_to_seq(model, dataloader)
+    # dataloader, dataset = load_next_sequence_data(0, 10)
+    # model = NextSequenceLSTM()
+    # train_seq_to_seq(model, dataloader)
+
+
+
+
+
+    trainloader, testloader, dataset = load_train_test_data(0, 1)
+    input_size = 5
+    hidden_size = 64
+    num_layers = 2
+    num_classes = len(dataset.label_mapping)
+
+    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+
+    train(model, trainloader, num_epochs=300, lr=1e-3, save_snapshots=True, snapshots_path="snapshots")

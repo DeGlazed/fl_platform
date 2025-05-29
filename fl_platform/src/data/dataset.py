@@ -238,7 +238,16 @@ def latlon_to_cell(lat, lon, cell_size_m=500):
     return (lat_cell, lon_cell)
 
 def get_client_quality_statistics(partition_id, num_partitions, label_mapping, default_data_extractor_dataset, spatial_granularity_m=500):
-    client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, default_data_extractor_dataset)
+    torch.manual_seed(42)
+    torch.cuda.manual_seed(42)
+    np.random.seed(42)
+
+    num_samples = len(default_data_extractor_dataset)
+    train_size = int(0.8 * num_samples)
+    test_size = num_samples - train_size
+    train_dataset, _ = torch.utils.data.random_split(default_data_extractor_dataset, [train_size, test_size])
+    
+    client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, train_dataset)
     
     labels = set()
     spatial_cells = set()
@@ -473,66 +482,4 @@ class TDriveMobilityDataset(Dataset):
     
         
 if __name__ == "__main__":
-  
-    # data = "geolife"
-    data = "tdirve"
-    
-    if data == "geolife":
-        # with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
-        #     geo_dataset = pickle.load(f)
-
-        with open('fl_platform\src\data\processed\geolife_next_point_separated_routes.pkl', 'rb') as f:
-            geo_dataset = pickle.load(f)
-        
-        filter_geo_dataset = {}
-        for client_id, data in geo_dataset.items():
-            filtered_data_dict = {}
-            for lable, df in data.items():
-                if 'run' not in lable and 'motorcycle' not in lable:
-                    filtered_data_dict[lable] = df
-            filter_geo_dataset[client_id] = filtered_data_dict
-        geo_dataset = filter_geo_dataset
-                        
-        labels = ['walk', 'bus', 'car', 'taxi', 'subway', 'train', 'bike'] #removed 'run' and 'motorcycle'
-        sorted_labels = sorted(labels)
-        label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
-        # print("Label Mapping:", label_mapping)
-
-        clients_subset=range(1,65)
-        
-        # dataset = GeoLifeMobilityDataset(geo_dataset, clients_subset, label_mapping,
-        #     feature_extractor=GeoLifeMobilityDataset.rich_extractor
-        # )
-
-        dataset = GeoLifeTrajectoryNextPointDataset(geo_dataset, clients_subset)
-
-        print("Dataset Size:", len(dataset))
-        print("Sample Data:", dataset[0])
-        print("Sample Data Shape:", dataset[0][0].shape)
-
-        client_dataset = get_client_dataset_split_following_normal_distribution(0, 5, dataset)
-        print("Client Dataset Size:", len(client_dataset))
-        print("Sample Data:", client_dataset[0])
-        print("Sample Data Shape:", client_dataset[0][0].shape)
-
-    if data == "tdirve":
-        with open('fl_platform\src\data\processed\\tdrive_next_point_separated_routes_by_day.pkl', 'rb') as f:
-            tdrive_dataset = pickle.load(f)
-
-        labels = ['walk', 'bus', 'car', 'taxi', 'subway', 'train', 'bike']
-        sorted_labels = sorted(labels)
-        label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
-
-        clients_subset = range(1, 65)
-        # dataset = TDriveTrajectorySeqToSeqDataset(tdrive_dataset, clients_subset)
-        # dataset = TDriveTrajectoryNextPointDataset(tdrive_dataset, clients_subset)
-        dataset = TDriveMobilityDataset(tdrive_dataset, clients_subset, label_mapping)
-
-        print("Dataset Size:", len(dataset))
-        print("Sample Data:", dataset[0])
-        print("Sample Data Shape:", dataset[0][0].shape)
-
-        client_dataset = get_client_dataset_split_following_normal_distribution(0, 5, dataset)
-        print("Client Dataset Size:", len(client_dataset))
-        print("Sample Data:", client_dataset[0])
-        print("Sample Data Shape:", client_dataset[0][0].shape)
+    pass

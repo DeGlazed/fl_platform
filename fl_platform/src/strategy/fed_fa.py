@@ -100,9 +100,7 @@ class TimestampSizeAwareFedFA(AbstractStrategy):
         self.params_queue = []
         self.first_round = True
 
-    def compute_new_global_model(self) -> OrderedDict:
-        mean_params = OrderedDict()
-        
+    def compute_weights(self) -> List[float]:
         total_weighted_samples = 0
         weights = []
 
@@ -115,14 +113,20 @@ class TimestampSizeAwareFedFA(AbstractStrategy):
         norm_timestamps = [(t - timestamp_min) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
         norm_samples = [(s - sample_min) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
         
-        for i in range(len(norm_timestamps)):
+        for i in range(len(self.info_queue)):
             weighted_avg = 0.5*norm_timestamps[i] + 0.5*norm_samples[i]
             weights.append(weighted_avg)
             total_weighted_samples += weighted_avg
         
         # Normalize weights
         weights = [w / total_weighted_samples for w in weights]
-        
+        return weights
+
+    def compute_new_global_model(self) -> OrderedDict:
+        mean_params = OrderedDict()
+
+        weights = self.compute_weights()
+
         for key in self.params_queue[0].keys():
             weighted_sum = np.zeros_like(self.params_queue[0][key])
             for i, state_dict in enumerate(self.params_queue):
@@ -165,10 +169,7 @@ class DataQualityAwareFedFA(AbstractStrategy):
         self.params_queue = []
         self.first_round = True
 
-    def compute_new_global_model(self) -> OrderedDict:
-        mean_params = OrderedDict()
-        max_time = max([float(info['timestamp']) for info in self.info_queue])
-        
+    def compute_weights(self) -> List[float]:
         quality_columns = ['label_diversity', 'spatial_diversity', 'temporal_diversity', 'sampling_regularity_std']
         quality_data = {}
         for i, info in enumerate(self.info_queue):
@@ -192,16 +193,21 @@ class DataQualityAwareFedFA(AbstractStrategy):
 
         norm_timestamps = [(t - timestamp_min) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
         norm_samples = [(s - sample_min) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
-        
         quality_weights = [df["score"].iloc[i] for i in range(len(self.info_queue))]
-        
-        for i in range(len(norm_timestamps)):
+
+        for i in range(len(self.info_queue)):
             weighted_avg = 0.33*norm_timestamps[i] + 0.33*norm_samples[i] + 0.33*quality_weights[i]
             weights.append(weighted_avg)
             total_weighted_samples += weighted_avg
         
         # Normalize weights
         weights = [w / total_weighted_samples for w in weights]
+        return weights
+
+    def compute_new_global_model(self) -> OrderedDict:
+        mean_params = OrderedDict()
+        
+        weights = self.compute_weights()
         
         for key in self.params_queue[0].keys():
             weighted_sum = np.zeros_like(self.params_queue[0][key])
@@ -211,6 +217,25 @@ class DataQualityAwareFedFA(AbstractStrategy):
         
         return mean_params
     
+    def evaluate(self):
+        if len(self.info_queue) < self.k:
+            logging.debug("Eval queue not full yet")
+            return None
+        
+        asyn_eval_acc = 0.0
+        asyn_eval_loss = 0.0
+
+        accs = [float(info['accuracy']) for info in self.info_queue]
+        losses = [float(info['loss']) for info in self.info_queue]
+
+        weights = self.compute_weights()
+
+        for i in range(len(accs)):
+            asyn_eval_acc += weights[i] * accs[i]
+            asyn_eval_loss += weights[i] * losses[i]
+
+        return { "accuracy": asyn_eval_acc, "loss": asyn_eval_loss }
+
     def get_number_of_initial_client_samples(self) -> int:
         return self.k
     

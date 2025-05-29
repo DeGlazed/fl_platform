@@ -3,8 +3,8 @@ from fl_platform.src.strategy.fed_fa import NaiveFedFA, SampleSizeAwareFedFA, Ti
 
 # strategy = NaiveFedFA(k=3)
 # strategy = SampleSizeAwareFedFA(k=3)
-strategy = TimestampSizeAwareFedFA(k=3)
-# strategy = DataQualityAwareFedFA(k=3)
+# strategy = TimestampSizeAwareFedFA(k=3)
+strategy = DataQualityAwareFedFA(k=3)
 
 
 # for docker
