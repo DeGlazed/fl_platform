@@ -39,7 +39,14 @@ if(__name__ == "__main__"):
     num_layers = 2
     num_classes = len(dataset.label_mapping)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    if partition_id == 1 or partition_id == 4:
+        device = torch.device("cpu")
+    else :
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
     model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
@@ -98,12 +105,12 @@ if(__name__ == "__main__"):
             
             num_epochs = 10
             lr = 1e-3
-            train(model, dataloader, num_epochs=num_epochs, lr=lr)
+            train(model, train_dataloader, device, num_epochs=num_epochs, lr=lr)
 
-            loss, acc = validate(model, val_dataloader)
+            loss, acc = validate(model, device, val_dataloader)
 
             training_info = {
-                "num_samples": len(dataloader.dataset),
+                "num_samples": len(train_dataloader.dataset),
                 "num_epochs": num_epochs,
                 "batch_size": 32,
                 "learning_rate": lr,

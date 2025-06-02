@@ -124,11 +124,11 @@ def load_next_sequence_data(partition_id, num_partitions, extractor=GeoLifeMobil
     dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate_next_sequence)
     return dataloader, dataset
 
-def train(model, dataloader, num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots"):
+def train(model, dataloader, device, num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots"):
     if save_snapshots and not os.path.exists(snapshots_path):
         os.makedirs(snapshots_path)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on device:", device)
     model.to(device)
     criterion = nn.CrossEntropyLoss().to(device)
@@ -260,8 +260,8 @@ def train_seq_to_seq(model, dataloader, num_epochs=10, lr=1e-3):
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
 
     # torch.cuda.empty_cache()  # Clear GPU memory
-def validate(model, dataloader):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def validate(model, device, dataloader):
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Testing on device:", device)
     model.to(device)
     model.eval()

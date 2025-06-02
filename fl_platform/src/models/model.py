@@ -68,7 +68,6 @@ class AttentionLSTM(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(hidden_size, hidden_size // 2),
             nn.ReLU(),
-            nn.Dropout(0.3),
             nn.Linear(hidden_size // 2, num_classes)
         )
         
