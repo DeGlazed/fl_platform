@@ -1,14 +1,12 @@
 from fl_platform.src.server import SimpleServer
-from fl_platform.src.strategy.fed_fa import FedFA
+from fl_platform.src.strategy.fed_fa import DataQualityAwareFedFA
 import os
 
-strategy = FedFA(k=3)  # Example strategy with k=5
+strategy = DataQualityAwareFedFA(k=3)
 
 # for kubernetes
-# kafka_server = os.getenv('KAFKA_SERVER')
-kafka_server = os.getenv('KAFKA_SERVER', 'kafka:30095')
-# localstack_server = os.getenv('LOCALSTACK_SERVER')
-localstack_server = os.getenv('LOCALSTACK_SERVER', 'http://localstack:30566')
+kafka_server = os.getenv('KAFKA_SERVER', 'localhost:9092')
+localstack_server = os.getenv('LOCALSTACK_SERVER', 'http://localhost:4566')
 
 print(f'Kafka server: {kafka_server}')
 print(f'Localstack server: {localstack_server}')
@@ -28,9 +26,9 @@ server = SimpleServer(
     localstack_server= localstack_server,
     localstack_bucket='mybucket',
 
-    ca_certificate_file_path='kafka-certs/ca-cert.pem',
-    certificate_file_path='kafka-certs/client-cert.pem',
-    key_file_path='kafka-certs/client-key.pem'
+    # ca_certificate_file_path='kafka-certs/ca-cert.pem',
+    # certificate_file_path='kafka-certs/client-cert.pem',
+    # key_file_path='kafka-certs/client-key.pem'
 )
 
 server.start_server()

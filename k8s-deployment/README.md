@@ -3,6 +3,10 @@
 kubectl create secret generic kafka-tls-secret --from-file=kafka.keystore.jks=.\kafka-certs\kafka.keystore.jks --from-file=kafka.truststore.jks=.\kafka-certs\kafka.truststore.jks
 ```
 
+```
+kubectl apply -f .
+```
+
 # Portforwarding
 ```
 kubectl port-forward svc/kafka 30095:9095 -n default

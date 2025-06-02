@@ -48,7 +48,7 @@ if(__name__ == "__main__"):
     kafka_server='localhost:9095', #SSL
     localstack_server='http://localhost:4566'
 
-    ## for kubernetes
+    # # for kubernetes
     # kafka_server='localhost:30095', #SSL
     # localstack_server='http://localhost:30566'
 
