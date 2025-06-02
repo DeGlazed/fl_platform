@@ -1,5 +1,5 @@
 from fl_platform.src.client import SimpleClient
-from fl_platform.src.models.model import SimpleLSTM
+from fl_platform.src.models.model import SimpleLSTM, AttentionLSTM
 import argparse
 import torch
 import time
@@ -36,12 +36,12 @@ if(__name__ == "__main__"):
 
     input_size = 5
     hidden_size = 64
-    # num_layers = 1
     num_layers = 2
     num_classes = len(dataset.label_mapping)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
     # for docker
     # kafka_server='localhost:9092', #PLAINTEXT
@@ -73,8 +73,8 @@ if(__name__ == "__main__"):
     start_time = time.time()
 
     while True: 
-        new_model = client.get_new_task()
-        if new_model:
+        model = client.get_new_task()
+        if model:
             print("Recv new model")
             print("Start training")
 
@@ -100,9 +100,9 @@ if(__name__ == "__main__"):
             
             num_epochs = 10
             lr = 1e-3
-            train(new_model, dataloader, num_epochs=num_epochs, lr=lr)
+            train(model, dataloader, num_epochs=num_epochs, lr=lr)
 
-            loss, acc = validate(new_model, val_dataloader)
+            loss, acc = validate(model, val_dataloader)
 
             training_info = {
                 "num_samples": len(dataloader.dataset),
@@ -116,7 +116,7 @@ if(__name__ == "__main__"):
             if stats:
                 training_info.update(stats)
 
-            client.publish_updated_model(new_model, training_info)
+            client.publish_updated_model(model, training_info)
             print("Sent model")
 
     client.close()

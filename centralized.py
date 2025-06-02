@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader
 from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution, GeoLifeTrajectoryNextPointDataset, GeoLifeTrajectorySeqToSeqDataset
-from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, NextLocationLSTM, NextSequenceLSTM
+from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, NextLocationLSTM, NextSequenceLSTM, AttentionLSTM
 import pickle
 import torch
 from torch import nn
@@ -288,6 +288,10 @@ def test(model, dataloader, snapshots_path):
     print("Testing on device:", device)
     for snapshot_file in snapshot_files:
         snapshot_path = os.path.join(snapshots_path, snapshot_file)
+        
+        if not snapshot_file.endswith('.pth'):
+            continue
+        
         with open(snapshot_path, 'rb') as f:
             state_dict = torch.load(f)
             model.load_state_dict(state_dict)
@@ -312,6 +316,10 @@ def test(model, dataloader, snapshots_path):
                 total += labels.size(0)
 
         accuracy = 100 * correct / total
+        loss = total_loss / len(dataloader)
+        logs_path = os.path.join(snapshots_path, "test_results.log")
+        with open(logs_path, 'a') as f:
+            f.write(f"{snapshot_file}: Loss={loss:.4f}, Accuracy={accuracy:.2f}%\n")
         print({"loss": total_loss / len(dataloader), "accuracy": accuracy})
 
 if __name__ == "__main__":
@@ -359,6 +367,10 @@ if __name__ == "__main__":
     num_layers = 2
     num_classes = len(dataset.label_mapping)
 
-    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
     train(model, trainloader, num_epochs=300, lr=1e-3, save_snapshots=True, snapshots_path="snapshots")
+    # test(model, testloader, snapshots_path="centralized_mobility_classification_results")
+
+
