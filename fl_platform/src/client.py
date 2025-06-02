@@ -11,6 +11,7 @@ import numpy as np
 import threading
 import ssl
 import requests
+import gc
 
 class State() :
     CONECTED = 0
@@ -452,6 +453,7 @@ class SimpleEvaluator():
                 total += labels.size(0)
 
         accuracy = 100 * correct / total
+        # torch.cuda.empty_cache()  # Clear GPU memory
         return {"loss": total_loss / len(self.test_loader), "accuracy": accuracy}
     
     def push_metrics(self, model_id, client_id, accuracy, loss, round_id):

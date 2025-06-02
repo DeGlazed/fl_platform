@@ -7,6 +7,7 @@ from torch import nn
 from tqdm import tqdm
 import os
 import numpy as np
+import gc
 
 # collate function for padding
 def pad_collate(batch):
@@ -179,6 +180,7 @@ def train(model, dataloader, num_epochs=10, lr=1e-3, save_snapshots=False, snaps
                 f.write(f"Epoch {epoch+1}: Loss={epoch_loss:.4f}, Accuracy={epoch_acc:.4f}\n")
 
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
+        # torch.cuda.empty_cache()  # Clear GPU memory
 
 def train_next_point(model, dataloader, num_epochs=10, lr=1e-3):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -218,6 +220,7 @@ def train_next_point(model, dataloader, num_epochs=10, lr=1e-3):
 
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
 
+    torch.cuda.empty_cache()  # Clear GPU memory
 def train_seq_to_seq(model, dataloader, num_epochs=10, lr=1e-3):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on device:", device)
@@ -256,6 +259,7 @@ def train_seq_to_seq(model, dataloader, num_epochs=10, lr=1e-3):
         epoch_loss = total_loss / len(dataloader)
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
 
+    # torch.cuda.empty_cache()  # Clear GPU memory
 def validate(model, dataloader):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Testing on device:", device)
@@ -280,6 +284,7 @@ def validate(model, dataloader):
     accuracy = 100 * correct / total
     loss = total_loss / len(dataloader)
     print(f"Validation Loss: {loss:.4f}, Accuracy: {accuracy:.2f}%")
+    # torch.cuda.empty_cache()  # Clear GPU memory
     return loss, accuracy
 
 def test(model, dataloader, snapshots_path):
@@ -321,6 +326,7 @@ def test(model, dataloader, snapshots_path):
         with open(logs_path, 'a') as f:
             f.write(f"{snapshot_file}: Loss={loss:.4f}, Accuracy={accuracy:.2f}%\n")
         print({"loss": total_loss / len(dataloader), "accuracy": accuracy})
+    # torch.cuda.empty_cache()  # Clear GPU memory
 
 if __name__ == "__main__":
 

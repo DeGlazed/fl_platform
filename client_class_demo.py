@@ -70,8 +70,6 @@ if(__name__ == "__main__"):
     )
 
     model.to(device)
-    start_time = time.time()
-
     while True: 
         model = client.get_new_task()
         if model:
