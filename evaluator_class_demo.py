@@ -42,19 +42,19 @@ input_size = 5
 hidden_size = 64
 num_layers = 2
 num_classes = len(dataset.label_mapping)
-# model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
-model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
+model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+# model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
-# for docker
-# kafka_server='localhost:9092', #PLAINTEXT
-kafka_server='localhost:9095', #SSL
-localstack_server='http://localhost:4566'
-pushgateway_server="http://localhost:9091"
+# # for docker
+# # kafka_server='localhost:9092', #PLAINTEXT
+# kafka_server='localhost:9095', #SSL
+# localstack_server='http://localhost:4566'
+# pushgateway_server='http://localhost:9091'
 
-## for kubernetes
-# kafka_server='localhost:30095', #SSL
-# localstack_server='http://localhost:30566'
-# pushgateway_server="http://localhost:30091"
+# for kubernetes
+kafka_server='localhost:30095', #SSL
+localstack_server='http://localhost:30566'
+pushgateway_server='http://localhost:30091'
 
 evaluator = SimpleEvaluator(
     model=model,

@@ -39,7 +39,7 @@ class SimpleServer():
                 ):
         
         logging.basicConfig(
-            filename='server.log',  
+            # filename='server.log',  
             level=logging.INFO)
         
         self.min_clients = min_clients
@@ -209,15 +209,14 @@ class SimpleServer():
                         training_info['timestamp'] = self.client_models_timestamps.get(client_id)
                         params_file = msg.value.get('payload')
                         self.s3_client.download_file(self.localstack_bucket, params_file, params_file)
-                        state_dict = torch.load(params_file)
+                        state_dict = torch.load(params_file, map_location=torch.device('cpu'))
                         if not isinstance(state_dict, OrderedDict):
                             raise ValueError("The loaded state_dict is not an OrderedDict.")
                         os.remove(params_file)
 
-                        # Convert state_dict tensors from CUDA to numpy (cpu)
+                        # Convert state_dict tensors to numpy (cpu)
                         for key, value in state_dict.items():
-                            if value.is_cuda:
-                                state_dict[key] = value.cpu().numpy()
+                            state_dict[key] = value.cpu().numpy()
 
                         logging.info(f"Received local parameters from client {client_id}.")
                         self.client_manager.set_finished(client_id)
@@ -415,7 +414,7 @@ class SimpleServer():
                         if(message_type == MessageType.CONNECT) :
                             initial_params_file = entry.value.get('payload')
                             s3_client.download_file(self.localstack_bucket, initial_params_file, "init_" + client_id + ".params")
-                            state_dict = torch.load("init_" + client_id + ".params")
+                            state_dict = torch.load("init_" + client_id + ".params", map_location=torch.device('cpu'))
                             if not isinstance(state_dict, OrderedDict):
                                 raise ValueError("The loaded state_dict is not an OrderedDict.")
                             with self.initial_params_lock:

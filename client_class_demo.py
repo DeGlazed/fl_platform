@@ -40,24 +40,24 @@ if(__name__ == "__main__"):
     num_classes = len(dataset.label_mapping)
 
     
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    if partition_id == 1 or partition_id == 4:
-        device = torch.device("cpu")
-    else :
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # if partition_id == 1 or partition_id == 4:
+    #     device = torch.device("cpu")
+    # else :
+    #     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
-    model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
+    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    # model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
-    # for docker
-    # kafka_server='localhost:9092', #PLAINTEXT
-    kafka_server='localhost:9095', #SSL
-    localstack_server='http://localhost:4566'
+    # # for docker
+    # # kafka_server='localhost:9092', #PLAINTEXT
+    # kafka_server='localhost:9095', #SSL
+    # localstack_server='http://localhost:4566'
 
-    # # for kubernetes
-    # kafka_server='localhost:30095', #SSL
-    # localstack_server='http://localhost:30566'
+    # for kubernetes
+    kafka_server='localhost:30095', #SSL
+    localstack_server='http://localhost:30566'
 
     client = SimpleClient(
         model=model,
@@ -103,7 +103,7 @@ if(__name__ == "__main__"):
                 collate_fn=pad_collate
             )
             
-            num_epochs = 10
+            num_epochs = 1
             lr = 1e-3
             train(model, train_dataloader, device, num_epochs=num_epochs, lr=lr)
 
