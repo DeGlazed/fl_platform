@@ -14,7 +14,7 @@ import requests
 import gc
 
 class State() :
-    CONECTED = 0
+    CONNECTED = 0
     READY = 1
     BUSY = 2
     FINISHED = 3
@@ -89,19 +89,6 @@ class SimpleClient():
             region_name=self.localstack_region_name
         )
 
-        init_state_dict = self.model.state_dict()
-
-        obj_name = f"init_{self.cid}.pth"
-        file_path = f"{self.tmp_dir}/" + obj_name
-        torch.save(init_state_dict, file_path)
-
-        # Upload the initial state dictionary to S3
-        self.s3_client.upload_file(
-            file_path,
-            self.localstack_bucket,
-            obj_name
-        )
-
         self.client_logs_producer = None
         if self.ssl_context:
             self.client_logs_producer = SecureMessageProducer(
@@ -114,17 +101,6 @@ class SimpleClient():
                 self.kafka_server,
                 self.client_logs_topic
             )
-
-        connect_message = Message(
-            cid=self.cid,
-            type=MessageType.CONNECT,
-            timestamp=str(time.time()),
-            payload=obj_name
-        )
-
-        logging.info(f"Client {self.cid} started")
-        self.client_logs_producer.send_message(connect_message)
-        os.remove(file_path)
 
         self.task_consumer = None
         if self.ssl_context:
@@ -152,6 +128,30 @@ class SimpleClient():
                 self.local_models_topic
             )
 
+        init_state_dict = self.model.state_dict()
+
+        obj_name = f"init_{self.cid}.pth"
+        file_path = f"{self.tmp_dir}/" + obj_name
+        torch.save(init_state_dict, file_path)
+
+        # Upload the initial state dictionary to S3
+        self.s3_client.upload_file(
+            file_path,
+            self.localstack_bucket,
+            obj_name
+        )
+
+        connect_message = Message(
+            cid=self.cid,
+            type=MessageType.CONNECT,
+            timestamp=str(time.time()),
+            payload=obj_name
+        )
+
+        logging.info(f"Client {self.cid} started")
+        self.client_logs_producer.send_message(connect_message)
+        os.remove(file_path)
+
         self.server_down = threading.Event()
         self.server_last_seen_lock = threading.Lock()
         self.server_last_seen = time.time()
@@ -165,7 +165,7 @@ class SimpleClient():
         heartbeat_producer_thread = threading.Thread(target=self.start_heartbeat_producer, args=(), daemon=True)
         heartbeat_producer_thread.start()
 
-        self.client_state = State.CONECTED
+        self.client_state = State.CONNECTED
 
     def get_new_task(self) -> nn.Module:
         if self.client_state != State.READY:

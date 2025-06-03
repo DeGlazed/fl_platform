@@ -13,9 +13,13 @@ spec:
       labels:
         app: grafana
     spec:
+      securityContext:
+        fsGroup: 472
       containers:
       - name: grafana
         image: grafana/grafana:latest
+        securityContext:
+          runAsUser: 472 
         env:
         - name: GF_SECURITY_ADMIN_USER
           value: "admin"

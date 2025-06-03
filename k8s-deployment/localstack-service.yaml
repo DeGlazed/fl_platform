@@ -4,15 +4,16 @@ metadata:
   name: localstack
   namespace: default
 spec:
-  type: NodePort
+  # type: NodePort
+  type: LoadBalancer
   selector:
     app: localstack
   ports:
     - port: 4566
       targetPort: 4566
-      nodePort: 30566
+      # nodePort: 30566
       name: edge
     - port: 4571
       targetPort: 4571
-      nodePort: 30571
+      # nodePort: 30571
       name: external

@@ -6,21 +6,22 @@ metadata:
 spec:
   selector:
     app: kafka
-  type: NodePort
+  # type: NodePort
+  type: LoadBalancer
   ports:
     - name: plaintext
       port: 9092
       targetPort: 9092
-      nodePort: 30092
+      # nodePort: 30092
     - name: controller
       port: 9093
       targetPort: 9093
-      nodePort: 30093
+      # nodePort: 30093
     - name: internal
       port: 9094
       targetPort: 9094
-      nodePort: 30094
+      # nodePort: 30094
     - name: ssl
       port: 9095
       targetPort: 9095
-      nodePort: 30095
+      # nodePort: 30095

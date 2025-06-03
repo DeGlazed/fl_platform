@@ -6,9 +6,10 @@ metadata:
 spec:
   selector:
     app: kafka-ui
-  type: NodePort
+  # type: NodePort
+  type: LoadBalancer
   ports:
     - name: http
       port: 8080
       targetPort: 8080
-      nodePort: 30080
+      # nodePort: 30080

@@ -55,9 +55,15 @@ if(__name__ == "__main__"):
     # kafka_server='localhost:9095', #SSL
     # localstack_server='http://localhost:4566'
 
-    # for kubernetes
-    kafka_server='localhost:30095', #SSL
-    localstack_server='http://localhost:30566'
+    # # for kubernetes
+    # # minikube
+    # kafka_server='localhost:30095', #SSL
+    # localstack_server='http://localhost:30566'
+
+    # GCE
+    server_host = 'deglazedrt.work'
+    kafka_server=f'kafka.{server_host}:9095', #SSL
+    localstack_server=f'http://localstack.{server_host}:4566'
 
     client = SimpleClient(
         model=model,

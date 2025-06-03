@@ -184,17 +184,17 @@ class SimpleServer():
                 just_started = False
 
             else:
-                # #Check stopping condition (less than min_clients)
-                # if len(self.client_manager.get_all_clients()) < self.min_clients:
-                #     logging.warning(f"Less than {self.min_clients} clients connected. Stopping server.")
-                #     self.server_stop.set()
-                #     break
-
-                #Check stopping condition (reached desired number of snapshots)
-                if self.snapshot > 500:
-                    logging.warning("Reached desired number of snapshots. Stopping server.")
+                #Check stopping condition (less than min_clients)
+                if len(self.client_manager.get_all_clients()) < self.min_clients:
+                    logging.warning(f"Less than {self.min_clients} clients connected. Stopping server.")
                     self.server_stop.set()
                     break
+
+                # #Check stopping condition (reached desired number of snapshots)
+                # if self.snapshot > 500:
+                #     logging.warning("Reached desired number of snapshots. Stopping server.")
+                #     self.server_stop.set()
+                #     break
 
 
                 result = self.local_consumer.consume_message(1000)
@@ -381,9 +381,12 @@ class SimpleServer():
     def startClientHandler(self) :
         message_consumer = None
         if self.ssl_context:
-            message_consumer = SecureMessageConsumer(self.kafka_server, self.client_logs_topic, self.ssl_context)
+            message_consumer = SecureMessageConsumer(self.kafka_server, 
+                                                     self.client_logs_topic, 
+                                                     self.ssl_context)
         else:
-            message_consumer = SimpleMessageConsumer(self.kafka_server, self.client_logs_topic)
+            message_consumer = SimpleMessageConsumer(self.kafka_server,
+                                                     self.client_logs_topic)
 
         s3_client = boto3.client(
             's3',
