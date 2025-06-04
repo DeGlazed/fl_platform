@@ -9,12 +9,23 @@ import os
 import numpy as np
 import gc
 
-# collate function for padding
-def pad_collate(batch):
+# # collate function for padding
+# def pad_collate(batch):
+#     sequences, labels = zip(*batch)
+#     lengths = [len(seq) for seq in sequences]
+#     padded = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
+#     return padded, torch.tensor(lengths), torch.tensor(labels)
+
+def pad_sort_collate(batch):
     sequences, labels = zip(*batch)
-    lengths = [len(seq) for seq in sequences]
-    padded = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
-    return padded, torch.tensor(lengths), torch.tensor(labels)
+    lengths = torch.tensor([len(seq) for seq in sequences])
+    sorted_len, sorted_idx = lengths.sort(0, descending=True)
+
+    sorted_seq = [sequences[i] for i in sorted_idx]
+    sorted_labels = torch.tensor([labels[i] for i in sorted_idx])
+
+    padded = torch.nn.utils.rnn.pad_sequence(sorted_seq, batch_first=True)
+    return padded, sorted_len, sorted_labels
 
 def pad_collate_next_point(batch):
     sequences, targets = zip(*batch)
@@ -32,6 +43,10 @@ def pad_collate_next_sequence(batch):
     return (padded_sequences, torch.tensor(input_lengths), padded_targets, torch.tensor(target_lengths))
 
 def load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.rich_extractor):
+    torch.manual_seed(42)
+    torch.cuda.manual_seed(42)
+    np.random.seed(42)
+
     with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
         geo_dataset = pickle.load(f)
     
@@ -56,7 +71,7 @@ def load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.ric
     )
 
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
-    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
+    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_sort_collate)
     return dataloader, dataset
 
 def load_train_test_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.rich_extractor):
@@ -91,8 +106,8 @@ def load_train_test_data(partition_id, num_partitions, extractor=GeoLifeMobility
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, train_dataset)
-    train_dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
-    test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, collate_fn=pad_collate)
+    train_dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_sort_collate)
+    test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, collate_fn=pad_sort_collate)
     
     return train_dataloader, test_dataloader, dataset
 
@@ -107,7 +122,7 @@ def load_next_point_data(partition_id, num_partitions, extractor=GeoLifeMobility
     )
 
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
-    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate_next_point)
+    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_sort_collate_next_point)
     return dataloader, dataset
 
 def load_next_sequence_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor):
@@ -121,14 +136,13 @@ def load_next_sequence_data(partition_id, num_partitions, extractor=GeoLifeMobil
     )
 
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
-    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_collate_next_sequence)
+    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_sort_collate_next_sequence)
     return dataloader, dataset
 
-def train(model, dataloader, device, num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots"):
+def train(model, dataloader, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots"):
     if save_snapshots and not os.path.exists(snapshots_path):
         os.makedirs(snapshots_path)
 
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on device:", device)
     model.to(device)
     criterion = nn.CrossEntropyLoss().to(device)
@@ -364,19 +378,27 @@ if __name__ == "__main__":
     # train_seq_to_seq(model, dataloader)
 
 
-
-
-
-    trainloader, testloader, dataset = load_train_test_data(0, 1)
-    input_size = 5
+    trainloader, testloader, dataset = load_train_test_data(0, 1, GeoLifeMobilityDataset.location_time_extractor)
+    input_size = 3
     hidden_size = 64
     num_layers = 2
     num_classes = len(dataset.label_mapping)
 
-    # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
-    model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
+    # Print first 5 elements of the first batch in trainloader
+    first_batch = next(iter(trainloader))
+    sequences, lengths, labels = first_batch
+    print("First 5 sequences:")
+    for i in range(min(5, len(sequences))):
+        print(f"Sequence {i+1}: shape={sequences[i].shape}, length={lengths[i]}")
+        print(f"Data: {sequences[i]}")
+        print(f"Label: {labels[i]}")
+        print("-" * 50)
+    print(lengths)
 
-    train(model, trainloader, num_epochs=300, lr=1e-3, save_snapshots=True, snapshots_path="snapshots")
-    # test(model, testloader, snapshots_path="centralized_mobility_classification_results")
+    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    # # model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
+
+    train(model, trainloader, num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots")
+    # # test(model, testloader, snapshots_path="centralized_mobility_classification_results")
 
 

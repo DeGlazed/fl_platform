@@ -9,7 +9,7 @@ class SimpleLSTM(nn.Module):
 
     def forward(self, x, lengths):
         lengths = lengths.cpu()
-        packed = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        packed = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True)
         _, (hn, _) = self.lstm(packed)
         out = self.classifier(hn[-1]) # Lasti hidden layer
         return out
@@ -31,7 +31,7 @@ class ConvLSTM(nn.Module):
         x = self.conv(x) # requires (batch, channels, seq_len)
         x = x.transpose(1, 2)  # → (batch, seq_len, conv_channels)
 
-        packed = nn.utils.rnn.pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        packed = nn.utils.rnn.pack_padded_sequence(x, lengths.cpu(), batch_first=True)
         _, (hn, _) = self.lstm(packed)
         return self.classifier(hn[-1])
     
@@ -94,7 +94,7 @@ class NextLocationLSTM(nn.Module):
 
     def forward(self, x, lengths):
         lengths = lengths.cpu()
-        packed = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        packed = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True)
         _ , (hn, _) = self.lstm(packed)
 
         output = self.regressor(hn[-1])
@@ -108,7 +108,7 @@ class Encoder(nn.Module):
 
     def forward(self, x, lengths):
         lengths = lengths.cpu()
-        packed = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        packed = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True)
         _, (h_out, c_out) = self.lstm(packed)
         return h_out, c_out
 

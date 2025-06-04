@@ -200,8 +200,10 @@ class GeoLifeMobilityDataset(Dataset):
         
         return np.stack([speeds, accelerations, bearings, bearings_delta, bearing_rates], axis=1)
     
-def generate_indeces_split(total_data_len, num_clients, mean=None, std=None, seed=42):
-    np.random.seed(seed)
+def generate_indeces_split(total_data_len, num_clients, mean=None, std=None):
+    torch.manual_seed(42)
+    torch.cuda.manual_seed(42)
+    np.random.seed(42)
     mean = mean or total_data_len / num_clients
     std = std or total_data_len / (num_clients * 2)
 
@@ -225,8 +227,8 @@ def generate_indeces_split(total_data_len, num_clients, mean=None, std=None, see
 
     return data_split
 
-def get_client_dataset_split_following_normal_distribution(client_idx, num_clients, dataset, mean=None, std=None, seed=42):
-    data_split = generate_indeces_split(len(dataset), num_clients, mean, std, seed)
+def get_client_dataset_split_following_normal_distribution(client_idx, num_clients, dataset, mean=None, std=None):
+    data_split = generate_indeces_split(len(dataset), num_clients, mean, std)
     client_data_indices = data_split[client_idx]
     client_dataset = Subset(dataset, client_data_indices)
     return client_dataset

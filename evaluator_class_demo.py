@@ -6,55 +6,27 @@ import pickle
 import torch
 from centralized import load_train_test_data
 
-def pad_collate(batch):
-    sequences, labels = zip(*batch)
-    lengths = [len(seq) for seq in sequences]
-    padded = torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True)
-    return padded, torch.tensor(lengths), torch.tensor(labels)
-
-with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
-    geo_dataset = pickle.load(f)
-
-filter_geo_dataset = {}
-for client_id, data in geo_dataset.items():
-    filtered_data_dict = {}
-    for lable, df in data.items():
-        if 'run' not in lable and 'motorcycle' not in lable:
-            filtered_data_dict[lable] = df
-    filter_geo_dataset[client_id] = filtered_data_dict
-geo_dataset = filter_geo_dataset
-                
-labels = ['walk', 'bus', 'car', 'taxi', 'subway', 'train', 'bike'] #removed 'run' and 'motorcycle'
-sorted_labels = sorted(labels)
-label_mapping = {label: idx for idx, label in enumerate(sorted_labels)}
-selected_clients = list(range(1, 65))
-
-# dataset = GeoLifeMobilityDataset(geo_dataset, selected_clients, label_mapping,
-#     feature_extractor=GeoLifeMobilityDataset.rich_extractor
-# )
-# dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=pad_collate)
-
-_, dataloader, dataset = load_train_test_data(0, 1)
+_, dataloader, dataset = load_train_test_data(0, 1, GeoLifeMobilityDataset.location_time_extractor)
 
 # dataloader = None
 
-input_size = 5
+input_size = 3
 hidden_size = 64
-num_layers = 2
+num_layers = 1
 num_classes = len(dataset.label_mapping)
 model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
 # model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
-# # for docker
-# # kafka_server='localhost:9092', #PLAINTEXT
-# kafka_server='localhost:9095', #SSL
-# localstack_server='http://localhost:4566'
-# pushgateway_server='http://localhost:9091'
+# for docker
+# kafka_server='localhost:9092', #PLAINTEXT
+kafka_server='localhost:9095', #SSL
+localstack_server='http://localhost:4566'
+pushgateway_server='http://localhost:9091'
 
-# for kubernetes
-kafka_server='localhost:30095', #SSL
-localstack_server='http://localhost:30566'
-pushgateway_server='http://localhost:30091'
+# # for kubernetes
+# kafka_server='localhost:30095', #SSL
+# localstack_server='http://localhost:30566'
+# pushgateway_server='http://localhost:30091'
 
 evaluator = SimpleEvaluator(
     model=model,
