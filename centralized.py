@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader
-from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution, GeoLifeTrajectoryNextPointDataset, GeoLifeTrajectorySeqToSeqDataset
-from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, NextLocationLSTM, NextSequenceLSTM, AttentionLSTM
+from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution, GeoLifeTrajectoryNextPointDataset, GeoLifeTrajectorySeqToSeqDataset, TDriveTrajectoryNextPointDataset
+from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, NextLocationLSTM
 import pickle
 import torch
 from torch import nn
@@ -122,7 +122,16 @@ def load_next_point_data(partition_id, num_partitions, extractor=GeoLifeMobility
     )
 
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
-    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_sort_collate_next_point)
+    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True)
+    return dataloader, dataset
+
+def load_next_point_data_tDrive(extractor=TDriveTrajectoryNextPointDataset.default_data_extractor, selected_clients=list(range(1, 100))):
+    with open('fl_platform\src\data\processed\\tdrive_next_point_filtered_min_len_10_separated_routes_by_day.pkl', 'rb') as f:
+        dataset = pickle.load(f)
+    dataset = TDriveTrajectoryNextPointDataset(dataset, selected_clients,
+        feature_extractor=extractor
+    )
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     return dataloader, dataset
 
 def load_next_sequence_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor):
@@ -136,7 +145,7 @@ def load_next_sequence_data(partition_id, num_partitions, extractor=GeoLifeMobil
     )
 
     client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
-    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True, collate_fn=pad_sort_collate_next_sequence)
+    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True)
     return dataloader, dataset
 
 def train(model, dataloader, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots"):
@@ -200,7 +209,7 @@ def train_next_point(model, dataloader, num_epochs=10, lr=1e-3):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on device:", device)
     model.to(device)
-    criterion = nn.MSELoss().to(device)  # Changed to MSE for regression
+    criterion = nn.MSELoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     for epoch in range(num_epochs):
@@ -212,12 +221,13 @@ def train_next_point(model, dataloader, num_epochs=10, lr=1e-3):
         progress_bar = tqdm(dataloader, desc="Training", leave=True)
 
         for batch in progress_bar:
-            sequences, lengths, targets = batch
-            sequences, lengths, targets = sequences.to(device), lengths.to(device), targets.to(device)
+            sequences, targets = batch
+            sequences, targets = sequences.to(device), targets.to(device)
 
             optimizer.zero_grad()
-            outputs = model(sequences, lengths)
-
+            outputs = model(sequences)
+            print(targets[0])
+            print(outputs[0])
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
@@ -225,7 +235,6 @@ def train_next_point(model, dataloader, num_epochs=10, lr=1e-3):
             batch_loss = loss.item()
             total_loss += batch_loss
 
-            # Update tqdm description dynamically
             progress_bar.set_postfix({
                 "batch_loss": f"{batch_loss:.4f}"
             })
@@ -308,7 +317,7 @@ def test(model, dataloader, snapshots_path):
     for snapshot_file in snapshot_files:
         snapshot_path = os.path.join(snapshots_path, snapshot_file)
         
-        if not snapshot_file.endswith('.pth'):
+        if not snapshot_file.endswith('.pt'):
             continue
         
         with open(snapshot_path, 'rb') as f:
@@ -378,27 +387,31 @@ if __name__ == "__main__":
     # train_seq_to_seq(model, dataloader)
 
 
-    trainloader, testloader, dataset = load_train_test_data(0, 1, GeoLifeMobilityDataset.location_time_extractor)
-    input_size = 3
-    hidden_size = 64
-    num_layers = 2
-    num_classes = len(dataset.label_mapping)
+    # trainloader, testloader, dataset = load_train_test_data(0, 1, extractor=GeoLifeMobilityDataset.rich_extractor)
+    # input_size = 5
+    # hidden_size = 64
+    # num_layers = 1
+    # num_classes = len(dataset.label_mapping)
 
-    # Print first 5 elements of the first batch in trainloader
-    first_batch = next(iter(trainloader))
-    sequences, lengths, labels = first_batch
-    print("First 5 sequences:")
-    for i in range(min(5, len(sequences))):
-        print(f"Sequence {i+1}: shape={sequences[i].shape}, length={lengths[i]}")
-        print(f"Data: {sequences[i]}")
-        print(f"Label: {labels[i]}")
-        print("-" * 50)
-    print(lengths)
+    # # Print first 5 elements of the first batch in trainloader
+    # # first_batch = next(iter(trainloader))
+    # # sequences, lengths, labels = first_batch
+    # # print("First 5 sequences:")
+    # # for i in range(min(5, len(sequences))):
+    # #     print(f"Sequence {i+1}: shape={sequences[i].shape}, length={lengths[i]}")
+    # #     print(f"Data: {sequences[i]}")
+    # #     print(f"Label: {labels[i]}")
+    # #     print("-" * 50)
+    # # print(lengths)
 
-    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
-    # # model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
+    # model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
+    # # # # model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
-    train(model, trainloader, num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots")
-    # # test(model, testloader, snapshots_path="centralized_mobility_classification_results")
+    # # train(model, trainloader, num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots")
+    # test(model, testloader, snapshots_path="model_results")
+    
+    
+    model = NextLocationLSTM(input_size=3, hidden_size=64, num_layers=1)
 
-
+    dataloader, dataset = load_next_point_data_tDrive(selected_clients=list(range(1, 100)))
+    train_next_point(model, dataloader, num_epochs=10, lr=1e-3)

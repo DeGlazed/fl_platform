@@ -64,15 +64,17 @@ class GeoLifeTrajectoryNextPointDataset(Dataset):
 
         for client_id in clients_subset:
             user_data = data_dict.get(client_id, {})
-            for label_key, df in user_data.items():
-                if len(df) < min_length:
+            for _, df in user_data.items():
+                if len(df) < sequence_length + 1:
                     continue
 
                 features = self.feature_extractor(df)
                 
                 for i in range(len(features) - sequence_length):
                     input_sequence = features[i:i+sequence_length]
-                    target_point = features[i+sequence_length][:2]
+                    target_point = features[i+sequence_length]
+                    delta_time = target_point[2] - input_sequence[-1][2]
+                    target_point = np.concatenate([target_point[:2], [delta_time]])
                     self.samples.append((input_sequence, target_point))
 
     def __len__(self):
@@ -166,12 +168,12 @@ class GeoLifeMobilityDataset(Dataset):
     
     @staticmethod
     def rich_extractor(df):
-        def compute_harvestine_distance(coord1, coord2) :
+        def compute_haversine_distance(coord1, coord2) :
             #need lat lon in radians
             lat1, lon1 = np.radians(coord1)
             lat2, lon2 = np.radians(coord2)
             tmp = np.sin((lat1 - lat2) / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin((lon1 - lon2) / 2) ** 2
-            ang_distance = 2 * np.arcsin(np.sqrt(tmp))
+            ang_distance = 2 * np.arctan2(np.sqrt(tmp), np.sqrt(1 - tmp))
             return ang_distance * 6371 * 1000
         
         def compute_bearing(coord1, coord2) :
@@ -189,7 +191,7 @@ class GeoLifeMobilityDataset(Dataset):
         time_deltas = np.diff(timestamps, prepend=timestamps[0])
         time_deltas[time_deltas == 0] = 1e-6
 
-        distances = np.array([compute_harvestine_distance(coords[i-1], coords[i]) if i > 0 else 0 for i in range(len(coords))])
+        distances = np.array([compute_haversine_distance(coords[i-1], coords[i]) if i > 0 else 0 for i in range(len(coords))])
         speeds = distances / time_deltas
         accelerations = np.diff(speeds, prepend=speeds[0]) / time_deltas
 
@@ -338,23 +340,24 @@ class TDriveTrajectorySeqToSeqDataset(Dataset):
     
 class TDriveTrajectoryNextPointDataset(Dataset):
     def __init__(self, data_dict, clients_subset,
-                 feature_extractor=None, min_length=10, sequence_length=20):
+                 feature_extractor=None, sequence_length=20):
         self.samples = []
         self.feature_extractor = feature_extractor or self.default_data_extractor
-        self.min_length = min_length
-        self.sequence_length = sequence_length
+        self.min_length = sequence_length + 1
 
         for client_id in clients_subset:
             user_data = data_dict.get(client_id, {})
-            for label_key, df in user_data.items():
-                if len(df) < min_length:
+            for _, df in user_data.items():
+                if len(df) < self.min_length:
                     continue
 
                 features = self.feature_extractor(df)
                 
                 for i in range(len(features) - sequence_length):
                     input_sequence = features[i:i+sequence_length]
-                    target_point = features[i+sequence_length][:2]
+                    target_point = features[i+sequence_length]
+                    delta_time = target_point[2] - input_sequence[-1][2]
+                    target_point = np.concatenate([target_point[:2], [delta_time]])
                     self.samples.append((input_sequence, target_point))
 
     def __len__(self):
@@ -448,7 +451,7 @@ class TDriveMobilityDataset(Dataset):
     
     @staticmethod
     def rich_extractor(df):
-        def compute_harvestine_distance(coord1, coord2) :
+        def compute_haversine_distance(coord1, coord2) :
             #need lat lon in radians
             lat1, lon1 = np.radians(coord1)
             lat2, lon2 = np.radians(coord2)
@@ -471,7 +474,7 @@ class TDriveMobilityDataset(Dataset):
         time_deltas = np.diff(timestamps, prepend=timestamps[0])
         time_deltas[time_deltas == 0] = 1e-6
 
-        distances = np.array([compute_harvestine_distance(coords[i-1], coords[i]) if i > 0 else 0 for i in range(len(coords))])
+        distances = np.array([compute_haversine_distance(coords[i-1], coords[i]) if i > 0 else 0 for i in range(len(coords))])
         speeds = distances / time_deltas
         accelerations = np.diff(speeds, prepend=speeds[0]) / time_deltas
 
