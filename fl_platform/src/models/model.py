@@ -64,7 +64,5 @@ class NextLocationLSTM(nn.Module):
         lat = self.lat_regressor(x)
         lon = self.lon_regressor(x)
         delta_time = self.delta_time_regressor(x)
-        lat = torch.clamp(lat, min=-90, max=90)
-        lon = torch.clamp(lon, min=-180, max=180)
         out = torch.cat([lat, lon, delta_time], dim=1)
         return out
