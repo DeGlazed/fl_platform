@@ -44,7 +44,7 @@ class Attention(nn.Module):
         self.attention = nn.Linear(hidden_size, hidden_size)
     
     def forward(self, lstm_out):
-        attention_out = self.attention(lstm_out)
+        attention_out = F.tanh(self.attention(lstm_out))
         attention_weights = F.softmax(attention_out, dim=1)
         context = torch.sum(lstm_out * attention_weights, dim=1)
         return context
