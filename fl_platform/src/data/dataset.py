@@ -238,7 +238,7 @@ def get_client_dataset_split_following_normal_distribution(client_idx, num_clien
 def latlon_to_cell(lat, lon, cell_size_m=500):
     # Approx cell to fixed lat/lon grid
     lat_cell = int(lat * 111000 / cell_size_m)
-    lon_cell = int(lon * 85000 / cell_size_m)
+    lon_cell = int(lon * 88000 / cell_size_m)
     return (lat_cell, lon_cell)
 
 def get_client_quality_statistics(partition_id, num_partitions, label_mapping, default_data_extractor_dataset, spatial_granularity_m=500):
@@ -272,7 +272,7 @@ def get_client_quality_statistics(partition_id, num_partitions, label_mapping, d
         timestamps = data_tensor[:, 2]
         for ts in timestamps:
             ts_datetime = pd.to_datetime(ts.item(), unit='s')
-            time_slots.add((ts_datetime.hour, ts_datetime.weekday()))
+            time_slots.add((ts_datetime.hour(), ts_datetime.weekday()))
         
         time_diffs = []
         for i in range(1, len(timestamps)):
