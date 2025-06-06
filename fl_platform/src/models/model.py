@@ -36,7 +36,7 @@ class ConvLSTM(nn.Module):
         _, (hn, _) = self.lstm(packed)
         return self.classifier(hn[-1])
 
-
+# inspired by https://github.com/chrisvdweth/ml-toolkit/blob/master/pytorch/models/text/classifier/rnn.py
 class Attention(nn.Module):
     def __init__(self, hidden_size):
         super(Attention, self).__init__()
