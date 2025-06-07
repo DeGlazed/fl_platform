@@ -272,7 +272,7 @@ def get_client_quality_statistics(partition_id, num_partitions, label_mapping, d
         timestamps = data_tensor[:, 2]
         for ts in timestamps:
             ts_datetime = pd.to_datetime(ts.item(), unit='s')
-            time_slots.add((ts_datetime.hour(), ts_datetime.weekday()))
+            time_slots.add((ts_datetime.hour, ts_datetime.weekday()))
         
         time_diffs = []
         for i in range(1, len(timestamps)):
