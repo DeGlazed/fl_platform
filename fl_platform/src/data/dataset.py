@@ -120,7 +120,7 @@ class GeoLifeMobilityDataset(Dataset):
                     continue
 
                 # Extract label
-                label = label_key.split("_", 1)[1]
+                label = label_key.split("_")[1]
                 label_id = self.label_mapping[label]
 
                 features = self.feature_extractor(df)
