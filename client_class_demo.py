@@ -1,5 +1,5 @@
 from fl_platform.src.client import SimpleClient
-from fl_platform.src.models.model import SimpleLSTM, AttentionLSTM
+from fl_platform.src.models.model import SimpleLSTM
 import argparse
 import torch
 import time
@@ -20,23 +20,21 @@ if(__name__ == "__main__"):
 
     args = parser.parse_args()
     partition_id = args.c
-    # num_partitions = args.p + 1
     num_partitions = args.p
 
-    dataloader, _, dataset = load_train_test_data(partition_id, num_partitions, GeoLifeMobilityDataset.location_time_extractor)
+    dataloader, _, dataset = load_train_test_data(partition_id, num_partitions, GeoLifeMobilityDataset.rich_extractor)
     stats = None
     _ , geo_dataset = load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor)
     stats = get_client_quality_statistics(partition_id, num_partitions, geo_dataset.label_mapping, geo_dataset)
 
-    input_size = 3
+    input_size = 5
     hidden_size = 64
-    num_layers = 1
+    num_layers = 2
     num_classes = len(dataset.label_mapping)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
-    # model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
     # for docker
     # kafka_server='localhost:9092', #PLAINTEXT

@@ -1,21 +1,20 @@
 from fl_platform.src.client import SimpleEvaluator
 from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution
-from fl_platform.src.models.model import SimpleLSTM, AttentionLSTM
+from fl_platform.src.models.model import SimpleLSTM
 from torch.utils.data import DataLoader
 import pickle
 import torch
 from centralized import load_train_test_data
 
-_, dataloader, dataset = load_train_test_data(0, 1, GeoLifeMobilityDataset.location_time_extractor)
+_, dataloader, dataset = load_train_test_data(0, 1, GeoLifeMobilityDataset.rich_extractor)
 
 # dataloader = None
 
-input_size = 3
+input_size = 5
 hidden_size = 64
-num_layers = 1
+num_layers = 2
 num_classes = len(dataset.label_mapping)
 model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
-# model = AttentionLSTM(input_size, hidden_size, num_layers, num_classes)
 
 # for docker
 # kafka_server='localhost:9092', #PLAINTEXT

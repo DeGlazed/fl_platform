@@ -25,13 +25,8 @@ def clean_trajectory_speed(trajectory, max_speed=55):
             offset = 0
     if len(to_drop) > 0:
         traj = traj.drop(to_drop).reset_index(drop=True)
-    
-    # print(f"before cleaning: {len(trajectory)} points, after cleaning: {len(traj)} points")
+
     return traj
-
-
-import concurrent.futures
-import threading
 
 length = len(processed_data)
 
@@ -49,3 +44,8 @@ for taxi_id, trips in processed_data.items():
     cleaned_trips = process_taxi_trips(trips)
     cleaned_processed_data[taxi_id] = cleaned_trips
     print(f"Progress: {len(cleaned_processed_data)}/{length}")
+    
+with open('fl_platform/src/data/processed/porto_data_cleaned.pkl', 'wb') as f:
+    pickle.dump(cleaned_processed_data, f)
+
+print("Cleaned data saved successfully.")
