@@ -1,56 +1,38 @@
+import torch
+from fl_platform.src.models.model import DropoffLSTM, SimpleLSTM
 
-from centralized import load_data, train, validate, load_train_test_data
-from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_quality_statistics, TDriveTrajectoryNextPointDataset
-from collections import Counter
-import pickle
-import pandas as pd
+def check_model_gpu_memory(model):
+    """Check the GPU memory usage of a PyTorch model"""
+    if torch.cuda.is_available():
+        # Get model memory usage
+        model_memory = sum(p.numel() * p.element_size() for p in model.parameters())
+        model_memory_mb = model_memory / (1024 ** 2)
+        
+        # Get current GPU memory usage
+        allocated_memory = torch.cuda.memory_allocated() / (1024 ** 2)
+        cached_memory = torch.cuda.memory_reserved() / (1024 ** 2)
+        
+        print(f"Model memory: {model_memory_mb:.2f} MB")
+        print(f"GPU allocated memory: {allocated_memory:.2f} MB")
+        print(f"GPU cached memory: {cached_memory:.2f} MB")
+        
+        return model_memory_mb
+    else:
+        print("CUDA not available")
+        return None
 
-# partition_id = 0
-# num_partitions = 100
+model = DropoffLSTM().cuda()
+check_model_gpu_memory(model)
 
-# train_dataloader, _, dataset = load_train_test_data(partition_id, num_partitions)
-# print(dataset.label_mapping)
-# print(len(dataset))
-
-# print(len(train_dataloader.dataset))
-# unique_labels = set()
-# for _, _, labels in train_dataloader:
-#     unique_labels.update(labels.tolist())
-# print(f"Number of distinct labels: {len(unique_labels)}")
-
-# label_counts = Counter()
-# for _, _, labels in train_dataloader:
-#     label_counts.update(labels.tolist())
-
-# print("Label distribution:")
-# for label, count in sorted(label_counts.items()):
-#     print(f"Label {label}: {count}")
-
-# print("Checking the quality of data")
-# _ , geo_dataset = load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor)
-# stats = get_client_quality_statistics(partition_id, num_partitions, geo_dataset.label_mapping, geo_dataset)
-# print(stats)
-
-with open('fl_platform\src\data\processed\\tdrive_next_point_filtered_min_len_10_separated_routes_by_day.pkl', 'rb') as f:
-    data_dict = pickle.load(f)
-
-for taxi_id, routes_dict in data_dict.items():
-    print(f"Taxi ID: {taxi_id}")
-    for index, (route_id, route_df) in enumerate(routes_dict.items()):
-        if 'big_df' not in locals():
-            big_df = route_df.copy()
-        else:
-            big_df = pd.concat([big_df, route_df], ignore_index=True)
-
-big_df.to_csv('big_df.csv', index=False)
-print(big_df.info())
+print("-----------------")
 
 
-# print(data_dict.keys())
+param_size = 0
+for param in model.parameters():
+    param_size += param.nelement() * param.element_size()
+buffer_size = 0
+for buffer in model.buffers():
+    buffer_size += buffer.nelement() * buffer.element_size()
 
-# client_subset = range(1, 10000)
-# dataset = TDriveTrajectoryNextPointDataset(data_dict, client_subset, TDriveTrajectoryNextPointDataset.default_data_extractor)
-# print(len(dataset))
-# sample = dataset[0]
-# print("Sample from dataset:")
-# print(sample)
+size_all_mb = (param_size + buffer_size) / 1024**2
+print('model size: {:.3f}MB'.format(size_all_mb))

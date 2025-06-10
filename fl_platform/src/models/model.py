@@ -36,33 +36,72 @@ class ConvLSTM(nn.Module):
         _, (hn, _) = self.lstm(packed)
         return self.classifier(hn[-1])
 
-# inspired by https://github.com/chrisvdweth/ml-toolkit/blob/master/pytorch/models/text/classifier/rnn.py
+# inspired
+# https://github.com/chrisvdweth/ml-toolkit/blob/master/pytorch/models/text/classifier/rnn.py
+# https://drlee.io/revolutionizing-time-series-prediction-with-lstm-with-the-attention-mechanism-090833a19af9
+# https://medium.com/@eugenesh4work/attention-mechanism-for-lstm-used-in-a-sequence-to-sequence-task-be1d54919876
+# https://ai.stackexchange.com/questions/41062/when-do-we-apply-a-mask-onto-our-padded-values-during-attention-mechanisms
 class Attention(nn.Module):
     def __init__(self, hidden_size):
         super(Attention, self).__init__()
         self.hidden_size = hidden_size
-        self.attention = nn.Linear(hidden_size, hidden_size)
+        self.attention1 = nn.Linear(hidden_size, 32)
+        self.attention2 = nn.Linear(32, 1)
+
+    def forward(self, lstm_out, lstm_len):
+        attention_out = self.attention1(lstm_out)
+        attention_out = self.attention2(F.relu(attention_out))
+        attention_scores = attention_out.squeeze(-1) 
     
-    def forward(self, lstm_out):
-        attention_out = F.tanh(self.attention(lstm_out))
-        attention_weights = F.softmax(attention_out, dim=1)
-        context = torch.sum(lstm_out * attention_weights, dim=1)
+        batch_size, max_len = attention_scores.size()
+        lstm_len = lstm_len.to(lstm_out.device)
+        mask = torch.arange(max_len, device=lstm_out.device).expand(batch_size, max_len) < lstm_len.unsqueeze(1)
+        
+        attention_scores = attention_scores.masked_fill(~mask, float('-inf'))
+        attention_weights = F.softmax(attention_scores, dim=-1)
+
+        context = torch.sum(lstm_out * attention_weights.unsqueeze(-1), dim=1)
         return context
             
-class NextLocationLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers):
-        super(NextLocationLSTM, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.attention = Attention(hidden_size)
-        self.lat_regressor = nn.Linear(hidden_size, 1)
-        self.lon_regressor = nn.Linear(hidden_size, 1)
-        self.delta_time_regressor = nn.Linear(hidden_size, 1)
+class DropoffLSTM(nn.Module):
+    def __init__(self):
+        super(DropoffLSTM, self).__init__()
+        self.hidden_size = 128
+        self.input_size = 3
+        self.num_layers = 3
+        self.metadata_features = 4
+        self.metadata_extracted = 32
 
-    def forward(self, x):
-        lstm_out, _ = self.lstm(x)
-        x = self.attention(lstm_out)
-        lat = self.lat_regressor(x)
-        lon = self.lon_regressor(x)
-        delta_time = self.delta_time_regressor(x)
-        out = torch.cat([lat, lon, delta_time], dim=1)
-        return out
+        self.arrival_clusters = 300
+
+        self.metadata_encoder = nn.Linear(self.metadata_features, self.metadata_extracted)
+        self.lstm = nn.LSTM(self.input_size, self.hidden_size, self.num_layers, batch_first=True)
+        self.attention = Attention(self.hidden_size)
+
+        self.arrival_zone_classifier = nn.Linear(self.hidden_size + self.metadata_extracted, self.arrival_clusters)
+
+        self.fc1 = nn.Linear(self.hidden_size + self.metadata_extracted + self.arrival_clusters, 64)
+        self.fc2 = nn.Linear(64, 2)
+
+    def forward(self, X_seq, X_seq_lengths, X_meta):
+
+        meta = self.metadata_encoder(X_meta)
+
+        packed_X_seq = nn.utils.rnn.pack_padded_sequence(X_seq, X_seq_lengths.cpu(), batch_first=True, enforce_sorted=True)
+        packed_lstm_out, _ = self.lstm(packed_X_seq)
+        
+        lstm_out, lstm_len = nn.utils.rnn.pad_packed_sequence(packed_lstm_out, batch_first=True)
+    
+        seq_data = self.attention(lstm_out, lstm_len)
+
+        x = torch.cat([seq_data, meta], dim=1)
+        
+        arrival_zone = F.softmax(self.arrival_zone_classifier(x), dim=1)
+
+        x = torch.cat([x, arrival_zone], dim=1)
+
+        delta_lat_lon = self.fc1(x)
+        delta_lat_lon = F.relu(delta_lat_lon)
+        delta_lat_lon = self.fc2(delta_lat_lon)
+
+        return arrival_zone, delta_lat_lon

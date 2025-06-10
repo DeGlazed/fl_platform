@@ -11,3 +11,4 @@ raw/
 venv
 *.log
 *.pth
+*.csv

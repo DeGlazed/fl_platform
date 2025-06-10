@@ -95,7 +95,7 @@ if(__name__ == "__main__"):
                 collate_fn=pad_sort_collate
             )
             
-            num_epochs = 5
+            num_epochs = 10
             lr = 1e-3
             train(model, train_dataloader, device, num_epochs=num_epochs, lr=lr)
 

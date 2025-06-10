@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader
-from fl_platform.src.data.dataset import GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution, GeoLifeTrajectoryNextPointDataset, GeoLifeTrajectorySeqToSeqDataset, TDriveTrajectoryNextPointDataset
-from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, NextLocationLSTM
+from fl_platform.src.data.dataset import TaxiPortoDataset, GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution
+from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, DropoffLSTM
 import pickle
 import torch
 from torch import nn
@@ -19,18 +19,6 @@ def pad_sort_collate(batch):
 
     padded = torch.nn.utils.rnn.pad_sequence(sorted_seq, batch_first=True)
     return padded, sorted_len, sorted_labels
-
-def pad_sort_collate_next_point(batch):
-    sequences, targets = zip(*batch)
-    lengths = torch.tensor([len(seq) for seq in sequences])
-    sorted_len, sorted_idx = lengths.sort(0, descending=True)
-
-    sorted_seq = [sequences[i] for i in sorted_idx]
-    sorted_targets = torch.tensor([targets[i] for i in sorted_idx])
-
-    padded_seq = torch.nn.utils.rnn.pad_sequence(sorted_seq, batch_first=True)
-    targets_tensor = torch.stack([torch.tensor(target, dtype=torch.float32) for target in sorted_targets])
-    return padded_seq, torch.tensor(lengths), targets_tensor
 
 def load_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.rich_extractor):
     torch.manual_seed(42)
@@ -101,20 +89,6 @@ def load_train_test_data(partition_id, num_partitions, extractor=GeoLifeMobility
     
     return train_dataloader, test_dataloader, dataset
 
-def load_next_point_data(partition_id, num_partitions, extractor=GeoLifeMobilityDataset.default_data_extractor):
-    with open('fl_platform\src\data\processed\geolife_next_point_separated_routes.pkl', 'rb') as f:
-        geo_dataset = pickle.load(f)
-
-    selected_clients = list(range(1, 65))
-
-    dataset = GeoLifeTrajectoryNextPointDataset(geo_dataset, selected_clients,
-        feature_extractor=extractor
-    )
-
-    client_dataset = get_client_dataset_split_following_normal_distribution(partition_id, num_partitions, dataset)
-    dataloader = DataLoader(client_dataset, batch_size=32, shuffle=True)
-    return dataloader, dataset
-
 def train(model, dataloader, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_epochs=10, lr=1e-3, save_snapshots=False, snapshots_path="snapshots"):
     if save_snapshots and not os.path.exists(snapshots_path):
         os.makedirs(snapshots_path)
@@ -172,84 +146,6 @@ def train(model, dataloader, device=torch.device("cuda" if torch.cuda.is_availab
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
         # torch.cuda.empty_cache()  # Clear GPU memory
 
-def train_next_point(model, dataloader, num_epochs=10, lr=1e-3):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Training on device:", device)
-    model.to(device)
-    criterion = nn.MSELoss().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
-    for epoch in range(num_epochs):
-        model.train()
-        total_loss = 0
-
-        print(f"\nEpoch {epoch+1}/{num_epochs}")
-
-        progress_bar = tqdm(dataloader, desc="Training", leave=True)
-
-        for batch in progress_bar:
-            sequences, targets = batch
-            sequences, targets = sequences.to(device), targets.to(device)
-
-            optimizer.zero_grad()
-            outputs = model(sequences)
-            print(targets[0])
-            print(outputs[0])
-            loss = criterion(outputs, targets)
-            loss.backward()
-            optimizer.step()
-
-            batch_loss = loss.item()
-            total_loss += batch_loss
-
-            progress_bar.set_postfix({
-                "batch_loss": f"{batch_loss:.4f}"
-            })
-
-        epoch_loss = total_loss / len(dataloader)
-
-        print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
-
-    torch.cuda.empty_cache()  # Clear GPU memory
-def train_seq_to_seq(model, dataloader, num_epochs=10, lr=1e-3):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Training on device:", device)
-    model.to(device)
-    criterion = nn.MSELoss().to(device)  # Changed to MSE for regression
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
-    for epoch in range(num_epochs):
-        model.train()
-        total_loss = 0
-
-        print(f"\nEpoch {epoch+1}/{num_epochs}")
-
-        progress_bar = tqdm(dataloader, desc="Training", leave=True)
-
-        for batch in progress_bar:
-            sequences, input_lengths, targets, target_lengths = batch
-            sequences, input_lengths, targets, target_lengths = sequences.to(device), input_lengths.to(device), targets.to(device), target_lengths.to(device)
-
-            optimizer.zero_grad()
-
-            outputs = model(sequences, input_lengths, targets)
-
-            loss = criterion(outputs, targets)
-            loss.backward()
-            optimizer.step()
-
-            batch_loss = loss.item()
-            total_loss += batch_loss
-
-            # Update tqdm description dynamically
-            progress_bar.set_postfix({
-                "batch_loss": f"{batch_loss:.4f}"
-            })
-
-        epoch_loss = total_loss / len(dataloader)
-        print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
-
-    # torch.cuda.empty_cache()  # Clear GPU memory
 def validate(model, device, dataloader):
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Testing on device:", device)
@@ -320,12 +216,61 @@ def test(model, dataloader, snapshots_path):
 
 if __name__ == "__main__":
 
-    trainloader, testloader, dataset = load_train_test_data(0, 1, extractor=GeoLifeMobilityDataset.rich_extractor)
-    input_size = 5
-    hidden_size = 64
-    num_layers = 1
-    num_classes = len(dataset.label_mapping)
+    model = DropoffLSTM()
+    data_path = "fl_platform\src\data\processed\c0_train_taxi_porto.pkl"
+    dataset = TaxiPortoDataset(data_path)
+    
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=64,
+        shuffle=True,
+        collate_fn=TaxiPortoDataset.random_sort_pad_collate
+    )
 
-    model = SimpleLSTM(input_size, hidden_size, num_layers, num_classes)
-    test(model, testloader, snapshots_path="model_results")
+    lr = 1e-3
+    num_epochs = 10
 
+    # Train loop
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Training on device:", device)
+    model.to(device)
+
+    mse_criterion = nn.MSELoss().to(device)
+    ce_criterion = nn.CrossEntropyLoss().to(device)
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.7)
+
+    for epoch in range(num_epochs):
+        model.train()
+        total_loss = 0
+
+        print(f"\nEpoch {epoch+1}/{num_epochs}")
+        progress_bar = tqdm(dataloader, desc="Training", leave=True)
+
+        for batch in progress_bar:
+            X_seq, lengths, X_metas, y_centroids, y_deltas = batch
+
+            X_seq, lengths, X_metas, y_centroids, y_deltas = X_seq.to(device), lengths.to(device), X_metas.to(device), y_centroids.to(device), y_deltas.to(device)
+
+            optimizer.zero_grad()
+            y_hat_centroids, y_hat_deltas = model(X_seq, lengths, X_metas)
+            
+            ce_loss = ce_criterion(y_hat_centroids, y_centroids)
+            mse_loss = mse_criterion(y_hat_deltas, y_deltas)
+            loss = ce_loss + mse_loss
+
+            loss.backward()
+            optimizer.step()
+
+            batch_loss = loss.item()
+            total_loss += batch_loss
+
+            progress_bar.set_postfix({
+                "batch_loss": f"{batch_loss:.4f}"
+            })
+
+        epoch_loss = total_loss / len(dataloader)
+        scheduler.step()
+
+        print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")

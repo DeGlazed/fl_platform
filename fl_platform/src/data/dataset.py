@@ -4,107 +4,6 @@ import numpy as np
 import pickle
 import pandas as pd
 
-class GeoLifeTrajectorySeqToSeqDataset(Dataset):
-    def __init__(self, data_dict, clients_subset,
-                 feature_extractor=None, min_length=10, sequence_length=5, prediction_length=5):
-        self.samples = []
-        self.feature_extractor = feature_extractor or self.default_data_extractor
-        self.min_length = min_length
-        self.sequence_length = sequence_length
-        self.prediction_length = prediction_length
-
-        for client_id in clients_subset:
-            user_data = data_dict.get(client_id, {})
-            for label_key, df in user_data.items():
-                if len(df) < min_length:
-                    continue
-
-                features = self.feature_extractor(df)
-                
-                for i in range(len(features) - sequence_length - prediction_length + 1):
-                    input_sequence = features[i:i+sequence_length]
-                    target_sequence = features[i+sequence_length:i+sequence_length+prediction_length][:, :2]
-                    self.samples.append((input_sequence, target_sequence))
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        input_seq, target_seq = self.samples[idx]
-        return torch.tensor(input_seq, dtype=torch.float32), torch.tensor(target_seq, dtype=torch.float32)
-
-    @staticmethod
-    def default_data_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-
-    @staticmethod
-    def location_time_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps - timestamps[0]
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-
-class GeoLifeTrajectoryNextPointDataset(Dataset):
-    def __init__(self, data_dict, clients_subset,
-                 feature_extractor=None, min_length=10, sequence_length=20):
-        self.samples = []
-        self.feature_extractor = feature_extractor or self.default_data_extractor
-        self.min_length = min_length
-        self.sequence_length = sequence_length
-
-        for client_id in clients_subset:
-            user_data = data_dict.get(client_id, {})
-            for _, df in user_data.items():
-                if len(df) < sequence_length + 1:
-                    continue
-
-                features = self.feature_extractor(df)
-                
-                for i in range(len(features) - sequence_length):
-                    input_sequence = features[i:i+sequence_length]
-                    target_point = features[i+sequence_length]
-                    delta_time = target_point[2] - input_sequence[-1][2]
-                    target_point = np.concatenate([target_point[:2], [delta_time]])
-                    self.samples.append((input_sequence, target_point))
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        sequence, target = self.samples[idx]
-        return torch.tensor(sequence, dtype=torch.float32), torch.tensor(target, dtype=torch.float32)
-
-    @staticmethod
-    def default_data_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-
-    @staticmethod
-    def location_time_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps - timestamps[0]
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-
 class GeoLifeMobilityDataset(Dataset):
     def __init__(self, data_dict, clients_subset, label_mapping,
                  feature_extractor=None, min_length=10):
@@ -288,203 +187,91 @@ def get_client_quality_statistics(partition_id, num_partitions, label_mapping, d
         "sampling_regularity_std": 1/(np.median(sampling_regularity_stds) + 1e-8)
     }
 
-class TDriveTrajectorySeqToSeqDataset(Dataset):
-    def __init__(self, data_dict, clients_subset,
-                 feature_extractor=None, min_length=10, sequence_length=5, prediction_length=5):
-        self.samples = []
-        self.feature_extractor = feature_extractor or self.default_data_extractor
-        self.min_length = min_length
-        self.sequence_length = sequence_length
-        self.prediction_length = prediction_length
-
-        for client_id in clients_subset:
-            user_data = data_dict.get(client_id, {})
-            for label_key, df in user_data.items():
-                if len(df) < min_length:
-                    continue
-
-                features = self.feature_extractor(df)
-                
-                for i in range(len(features) - sequence_length - prediction_length + 1):
-                    input_sequence = features[i:i+sequence_length]
-                    target_sequence = features[i+sequence_length:i+sequence_length+prediction_length][:, :2]
-                    self.samples.append((input_sequence, target_sequence))
+class TaxiPortoDataset(Dataset):
+    def __init__(self, data_path) :
+        with open(data_path, 'rb') as f:
+            self.data = pickle.load(f)
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.data)
 
     def __getitem__(self, idx):
-        input_seq, target_seq = self.samples[idx]
-        return torch.tensor(input_seq, dtype=torch.float32), torch.tensor(target_seq, dtype=torch.float32)
+        item = self.data[idx]
 
-    @staticmethod
-    def default_data_extractor(df):
+        df = item['df']
         coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-
-    @staticmethod
-    def location_time_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps - timestamps[0]
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-    
-class TDriveTrajectoryNextPointDataset(Dataset):
-    def __init__(self, data_dict, clients_subset,
-                 feature_extractor=None, sequence_length=20):
-        self.samples = []
-        self.feature_extractor = feature_extractor or self.default_data_extractor
-        self.min_length = sequence_length + 1
-
-        for client_id in clients_subset:
-            user_data = data_dict.get(client_id, {})
-            for _, df in user_data.items():
-                if len(df) < self.min_length:
-                    continue
-
-                features = self.feature_extractor(df)
-                
-                for i in range(len(features) - sequence_length):
-                    input_sequence = features[i:i+sequence_length]
-                    target_point = features[i+sequence_length]
-                    delta_time = target_point[2] - input_sequence[-1][2]
-                    target_point = np.concatenate([target_point[:2], [delta_time]])
-                    self.samples.append((input_sequence, target_point))
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        sequence, target = self.samples[idx]
-        return torch.tensor(sequence, dtype=torch.float32), torch.tensor(target, dtype=torch.float32)
-
-    @staticmethod
-    def default_data_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-
-    @staticmethod
-    def location_time_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps - timestamps[0]
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-    
-class TDriveMobilityDataset(Dataset):
-    def __init__(self, data_dict, clients_subset, label_mapping,
-                 feature_extractor=None, min_length=10):
-        self.samples = []
-        self.label_mapping = label_mapping
-        self.feature_extractor = feature_extractor or self.default_data_extractor
-        self.min_length = min_length
-
-        for client_id in clients_subset:
-            user_data = data_dict.get(client_id, {})
-            for label_key, df in user_data.items():
-                if len(df) < min_length:
-                    continue
-
-                # Extract label
-                label = 'taxi'
-                label_id = self.label_mapping[label]
-
-                features = self.feature_extractor(df)
-                self.samples.append((features, label_id))
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        features, label = self.samples[idx]
-        return torch.tensor(features, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
-
-    @staticmethod
-    def default_data_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-
-    @staticmethod
-    def location_time_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        # Normalized timestamp
-        timestamps = timestamps - timestamps[0]
-        timestamps = timestamps.reshape(-1, 1)
-
-        features = np.hstack([coords, timestamps])
-        return features
-
-    @staticmethod
-    def delta_extractor(df):
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
-
-        lat_lon_deltas = np.diff(coords, axis=0, prepend=coords[0:1])
-        time_deltas = np.diff(timestamps, prepend=timestamps[0]).reshape(-1, 1)
-
-        features = np.hstack([lat_lon_deltas, time_deltas])
-        return features
-    
-    @staticmethod
-    def rich_extractor(df):
-        def compute_haversine_distance(coord1, coord2) :
-            #need lat lon in radians
-            lat1, lon1 = np.radians(coord1)
-            lat2, lon2 = np.radians(coord2)
-            tmp = np.sin((lat1 - lat2) / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin((lon1 - lon2) / 2) ** 2
-            ang_distance = 2 * np.arcsin(np.sqrt(tmp))
-            return ang_distance * 6371 * 1000
+        delta_time = df['delta_time'].astype('float').values
+        delta_time = delta_time.reshape(-1, 1)
         
-        def compute_bearing(coord1, coord2) :
-            #need lat lon in radians
-            lat1, lon1 = np.radians(coord1)
-            lat2, lon2 = np.radians(coord2)
-            x = np.cos(lat2) * np.sin(lon2 - lon1)
-            y = np.cos(lat1) * np.sin(lat2) - np.sin(lat1) * np.cos(lat2) * np.cos(lon2 - lon1)
-            bearing = np.arctan2(x, y)
-            return np.degrees(bearing) % 360
-        
-        coords = df[['latitude', 'longitude']].values
-        timestamps = df['timestamp'].astype('float').values
+        X_seq = np.hstack([coords, delta_time])
+        X_meta = item['x_metadata']
+        y_centroid = item['y_centroid']
+        y_delta = item['y_delta']
 
-        time_deltas = np.diff(timestamps, prepend=timestamps[0])
-        time_deltas[time_deltas == 0] = 1e-6
+        return torch.tensor(X_seq, dtype=torch.float32), torch.tensor(X_meta, dtype=torch.float32), torch.tensor(y_centroid, dtype=torch.long), torch.tensor(y_delta, dtype=torch.float32)
 
-        distances = np.array([compute_haversine_distance(coords[i-1], coords[i]) if i > 0 else 0 for i in range(len(coords))])
-        speeds = distances / time_deltas
-        accelerations = np.diff(speeds, prepend=speeds[0]) / time_deltas
+    @staticmethod
+    def random_sort_pad_collate(batch):
+        X_sequences, X_metas, y_centroids, y_deltas = zip(*batch)
 
+        #random
+        X_random_sequences = []
+        for seq in X_sequences:
+            random_len = np.random.randint(1, len(seq) + 1)
+            X_random_sequences.append(seq[:random_len])
 
-        bearings = np.array([compute_bearing(coords[i-1], coords[i]) if i > 0 else 0 for i in range(len(coords))])
-        bearings_delta = np.diff(bearings, prepend=bearings[0])
-        bearing_rates = bearings_delta / time_deltas
-        
-        return np.stack([speeds, accelerations, bearings, bearings_delta, bearing_rates], axis=1)
-    
-        
+        #sort
+        lengths = torch.tensor([len(seq) for seq in X_random_sequences])
+        sorted_len, sorted_idx = lengths.sort(0, descending=True)
+
+        X_sequences_sorted = [X_random_sequences[i] for i in sorted_idx]
+        X_metas_sorted = [X_metas[i] for i in sorted_idx]
+        y_centroids_sorted = [y_centroids[i] for i in sorted_idx]
+        y_deltas_sorted = [y_deltas[i] for i in sorted_idx]
+
+        #pad
+        X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
+
+        # X_metas_out = torch.stack([torch.tensor(target) for target in X_metas_sorted])
+        # y_centroids_out = torch.tensor(y_centroids_sorted)
+        # y_deltas_out = torch.stack([torch.tensor(target) for target in y_deltas_sorted])
+
+        X_metas_out = torch.stack([target.clone().detach() for target in X_metas_sorted])
+        y_centroids_out = torch.tensor(y_centroids_sorted)
+        y_deltas_out = torch.stack([target.clone().detach() for target in y_deltas_sorted])
+
+        return X_padded_seq, sorted_len, X_metas_out, y_centroids_out, y_deltas_out
+
 if __name__ == "__main__":
-    pass
+    data_path = "processed/porto_dataset.pkl"
+    dataset = TaxiPortoDataset(data_path, client_id=0, num_partitions=10)
+    
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=2,
+        shuffle=False,
+        collate_fn=TaxiPortoDataset.random_sort_pad_collate
+    )
+
+    print("first run------------------------------------------------------------")
+    for batch in dataloader:
+        X_padded_seq, lengths, X_metas_out, y_centroids_out, y_deltas_out = batch
+        print("First element of the first batch:")
+        print(f"X_padded_seq[0]: {X_padded_seq[0]}")
+        print(f"lengths[0]: {lengths[0]}")
+        print(f"X_metas_out[0]: {X_metas_out[0]}")
+        print(f"y_centroids_out[0]: {y_centroids_out[0]}")
+        print(f"y_deltas_out[0]: {y_deltas_out[0]}")
+        break
+
+    print("second run------------------------------------------------------------")
+    for batch in dataloader:
+        X_padded_seq, lengths, X_metas_out, y_centroids_out, y_deltas_out = batch
+        print("First element of the first batch:")
+        print(f"X_padded_seq[0]: {X_padded_seq[0]}")
+        print(f"lengths[0]: {lengths[0]}")
+        print(f"X_metas_out[0]: {X_metas_out[0]}")
+        print(f"y_centroids_out[0]: {y_centroids_out[0]}")
+        print(f"y_deltas_out[0]: {y_deltas_out[0]}")
+        break
+    
