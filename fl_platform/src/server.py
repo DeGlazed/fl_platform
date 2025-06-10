@@ -397,6 +397,10 @@ class SimpleServer():
         )
         waiting_clients_to_be_ready = []
         waiting_client_to_disconnect = []
+
+        unknown_client_requests = []
+        grace_period = 120
+
         while True:
             results = message_consumer.consume_message(1000)
             if(results):
@@ -411,8 +415,10 @@ class SimpleServer():
                         elif(message_type == MessageType.DISCONNECT) :
                             logging.debug(f"Client {client_id} disconnected.")
                             waiting_client_to_disconnect.append(client_id)
-                            with self.client_pool_lock:
-                                self.client_pool += 1
+                            if(self.client_manager.get_client_state(client_id) == ClientState.BUSY):
+                                self.client_manager.set_finished(client_id)
+                                with self.client_pool_lock:
+                                    self.client_pool += 1
                     else :
                         if(message_type == MessageType.CONNECT) :
                             initial_params_file = entry.value.get('payload')
@@ -426,18 +432,39 @@ class SimpleServer():
 
                             logging.info(f"Client {client_id} connected.")
                             self.client_manager.add_client(client_id)
+                        
+                        else :
+                            unknown_client_requests.append({'cid': client_id, 'type': message_type, 'timestamp': time.time()})
+                            logging.info(f"Received message from unknown client {client_id} with type {message_type}. Adding to unknown requests.")
+
+            temp = []
+            for request in unknown_client_requests:
+                client_id = request['cid']
+                message_type = request['type']
+                if time.time() - request['timestamp'] < grace_period:
+                    if client_id in self.client_manager.get_all_clients():
+                        if(message_type == MessageType.TASK) :
+                            waiting_clients_to_be_ready.append(client_id)
+                            logging.info(f"Client {client_id} identified and ready for task.")
+
+                        elif(message_type == MessageType.DISCONNECT) :
+                            waiting_client_to_disconnect.append(client_id)
+                            logging.info(f"Client {client_id} identified and ready for disconnect.")
+                    else:
+                        temp.append(request)
+            unknown_client_requests = temp
 
             for client_id in waiting_clients_to_be_ready:
                 if self.client_manager.get_client_state(client_id) == ClientState.CONNECTED or self.client_manager.get_client_state(client_id) == ClientState.FINISHED:
-                    logging.debug(f"Client {client_id} is ready for new task.")
                     self.client_manager.set_ready(client_id)
                     waiting_clients_to_be_ready.remove(client_id)
+                    logging.debug(f"Client {client_id} is ready for new task.")
 
             for client_id in waiting_client_to_disconnect:
                 if self.client_manager.get_client_state(client_id) == ClientState.CONNECTED or self.client_manager.get_client_state(client_id) == ClientState.FINISHED:
-                    logging.debug(f"Client {client_id} is ready for disconnection.")
                     self.client_manager.remove_client(client_id)
                     waiting_client_to_disconnect.remove(client_id)
+                    logging.debug(f"Client {client_id} disconnected.")
 
     def start_heartbeat_listener(self):
         heartbeat_consumer = None

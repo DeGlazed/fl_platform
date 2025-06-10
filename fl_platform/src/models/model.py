@@ -80,8 +80,12 @@ class DropoffLSTM(nn.Module):
 
         self.arrival_zone_classifier = nn.Linear(self.hidden_size + self.metadata_extracted, self.arrival_clusters)
 
-        self.fc1 = nn.Linear(self.hidden_size + self.metadata_extracted + self.arrival_clusters, 64)
-        self.fc2 = nn.Linear(64, 2)
+        self.coord_extract = nn.Sequential(
+            nn.Linear(self.hidden_size + self.metadata_extracted + self.arrival_clusters, 64),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(64, 2)
+        )
 
     def forward(self, X_seq, X_seq_lengths, X_meta):
 
@@ -100,8 +104,31 @@ class DropoffLSTM(nn.Module):
 
         x = torch.cat([x, arrival_zone], dim=1)
 
-        delta_lat_lon = self.fc1(x)
-        delta_lat_lon = F.relu(delta_lat_lon)
-        delta_lat_lon = self.fc2(delta_lat_lon)
+        lat_lon = self.coord_extract(x)
 
-        return arrival_zone, delta_lat_lon
+        return arrival_zone, lat_lon
+
+class HaversineLoss(nn.Module):
+    def __init__(self):
+        super(HaversineLoss, self).__init__()
+        self.R = 6371000.0
+    
+    def forward(self, lat_lon_pred, lat_lon_true):
+        lat1, lon1 = lat_lon_pred[:, 0], lat_lon_pred[:, 1]
+        lat2, lon2 = lat_lon_true[:, 0], lat_lon_true[:, 1]
+
+        lat1 = torch.deg2rad(lat1)
+        lon1 = torch.deg2rad(lon1)
+
+        lat2 = torch.deg2rad(lat2)
+        lon2 = torch.deg2rad(lon2)
+
+        phi1 = lat1
+        phi2 = lat2
+        delta_phi = phi2 - phi1
+        delta_lambda = lon2 - lon1
+
+        a = torch.sin(delta_phi / 2) ** 2 + torch.cos(phi1) * torch.cos(phi2) * torch.sin(delta_lambda / 2) ** 2
+        c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
+        haversine = self.R * c
+        return torch.mean(haversine)

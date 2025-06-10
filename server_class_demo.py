@@ -1,10 +1,11 @@
 from fl_platform.src.server import SimpleServer
-from fl_platform.src.strategy.fed_fa import NaiveFedFA, SampleSizeAwareFedFA, TimestampSizeAwareFedFA, DataQualityAwareFedFA
+from fl_platform.src.strategy.fed_fa import NaiveFedFA, SampleSizeAwareFedFA, TimestampSizeAwareFedFA, DataQualityAwareFedFA, TaxiFedFA
 
 # strategy = NaiveFedFA(k=3)
 # strategy = SampleSizeAwareFedFA(k=3)
 # strategy = TimestampSizeAwareFedFA(k=3)
-strategy = DataQualityAwareFedFA(k=3)
+# strategy = DataQualityAwareFedFA(k=3)
+strategy = TaxiFedFA(k=3)
 
 # for docker
 # kafka_server='localhost:9092', #PLAINTEXT
