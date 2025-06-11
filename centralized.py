@@ -273,7 +273,23 @@ def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 0.7, ep
         epoch_e2_loss = total_e2_loss / len(dataloader)
 
         print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}, E1 Loss: {epoch_e1_loss:.4f}, E2 Loss: {epoch_e2_loss:.4f}")
-    return total_loss / len(dataloader)
+    
+    dataloader_length = len(dataloader)
+    
+    del X_seq 
+    del lengths 
+    del y_centroids 
+    del y_deltas
+    
+    del hav_centroid_criterion
+    del hav_location_criterion
+    del loss
+    del e1_loss
+    del e2_loss
+    
+    torch.cuda.empty_cache()
+    
+    return total_loss / dataloader_length
 
 def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.7):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -335,6 +351,19 @@ def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.7):
     print(f"Hav Dist: {avg_e1_loss:.4f}")
     print(f"Dist From Centroids: {avg_e2_loss:.4f}")
     print(f"Centroid Accuracy: {centroid_accuracy:.2f}%")
+
+    del X_seq 
+    del lengths 
+    del y_centroids 
+    del y_deltas
+    
+    del hav_centroid_criterion
+    del hav_location_criterion
+    del loss
+    del e1_loss
+    del e2_loss
+    
+    torch.cuda.empty_cache()
 
     return avg_loss, avg_e1_loss, avg_e2_loss, centroid_accuracy
 
