@@ -67,20 +67,20 @@ if(__name__ == "__main__"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
 
-    # for docker
-    # kafka_server='localhost:9092', #PLAINTEXT
-    kafka_server='localhost:9095', #SSL
-    localstack_server='http://localhost:4566'
+    # # for docker
+    # # kafka_server='localhost:9092', #PLAINTEXT
+    # kafka_server='localhost:9095', #SSL
+    # localstack_server='http://localhost:4566'
 
     # # for kubernetes
     # # minikube
     # kafka_server='localhost:30095', #SSL
     # localstack_server='http://localhost:30566'
 
-    # # GCE
-    # server_host = 'deglazedrt.work'
-    # kafka_server=f'kafka.{server_host}:9095', #SSL
-    # localstack_server=f'http://localstack.{server_host}:4566'
+    # GCE
+    server_host = 'deglazedrt.work'
+    kafka_server=f'kafka.{server_host}:9095', #SSL
+    localstack_server=f'http://localstack.{server_host}:4566'
 
     client = SimpleClient(
         model=model,

@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: server
-          image: deglazed/server-demo:latest
+          image: deglazed/server-demo:taxi
           env:
             - name: KAFKA_SERVER
               value: "kafka:9092"

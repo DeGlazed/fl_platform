@@ -75,16 +75,22 @@ dest_centroids = torch.tensor(dest_centroids_df[['latitude', 'longitude']].value
 
 model = DropoffLSTM()
 
-# for docker
-# kafka_server='localhost:9092', #PLAINTEXT
-kafka_server='localhost:9095', #SSL
-localstack_server='http://localhost:4566'
-pushgateway_server='http://localhost:9091'
+# # for docker
+# # kafka_server='localhost:9092', #PLAINTEXT
+# kafka_server='localhost:9095', #SSL
+# localstack_server='http://localhost:4566'
+# pushgateway_server='http://localhost:9091'
 
 # # for kubernetes
 # kafka_server='localhost:30095', #SSL
 # localstack_server='http://localhost:30566'
 # pushgateway_server='http://localhost:30091'
+
+# GCE
+server_host = 'deglazedrt.work'
+kafka_server=f'kafka.{server_host}:9095', #SSL
+localstack_server=f'http://localstack.{server_host}:4566'
+pushgateway_server=f'http://pushgateway.{server_host}:9091'
 
 # evaluator = SimpleEvaluator(
 #     model=model,
