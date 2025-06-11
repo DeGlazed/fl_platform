@@ -98,6 +98,8 @@ if(__name__ == "__main__"):
         certificate_file_path='kafka-certs/client-cert.pem',
         key_file_path='kafka-certs/client-key.pem'
     )
+    
+    warm_runs = 5
 
     while True: 
         res = client.get_new_task()
@@ -145,12 +147,29 @@ if(__name__ == "__main__"):
             if stats:
                 training_info.update(stats)
             '''
-            dataloader = torch.utils.data.DataLoader(
-                    dataset,
-                    batch_size=64,
-                    shuffle=True,
-                    collate_fn=TaxiPortoDataset.random_sort_pad_collate
-                )
+            if(warm_runs < 5):
+                dataloader = torch.utils.data.DataLoader(
+                        dataset,
+                        batch_size=64,
+                        shuffle=True,
+                        collate_fn=TaxiPortoDataset.sort_pad_collate
+                    )
+            else:
+                if np.random.rand() < 0.5:
+                    dataloader = torch.utils.data.DataLoader(
+                        dataset,
+                        batch_size=64,
+                        shuffle=True,
+                        collate_fn=TaxiPortoDataset.sort_pad_collate
+                    )
+                else:
+                    dataloader = torch.utils.data.DataLoader(
+                        dataset,
+                        batch_size=64,
+                        shuffle=True,
+                        collate_fn=TaxiPortoDataset.random_sort_pad_collate
+                    )
+            warm_runs += 1
 
             epochs = 3
             lr = 1e-3

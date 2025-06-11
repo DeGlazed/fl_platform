@@ -216,7 +216,7 @@ def test(model, dataloader, snapshots_path):
     # torch.cuda.empty_cache()  # Clear GPU memory
 
 
-def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 0.7, epochs = 3):
+def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 0.5, epochs = 3):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on device:", device)
@@ -291,7 +291,7 @@ def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 0.7, ep
     
     return total_loss / dataloader_length
 
-def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.7):
+def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.5):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Evaluating on device:", device)
     model.to(device)

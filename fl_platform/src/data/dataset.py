@@ -232,9 +232,26 @@ class TaxiPortoDataset(Dataset):
         #pad
         X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
 
-        # X_metas_out = torch.stack([torch.tensor(target) for target in X_metas_sorted])
-        # y_centroids_out = torch.tensor(y_centroids_sorted)
-        # y_deltas_out = torch.stack([torch.tensor(target) for target in y_deltas_sorted])
+        X_metas_out = torch.stack([target.clone().detach() for target in X_metas_sorted])
+        y_centroids_out = torch.tensor(y_centroids_sorted)
+        y_deltas_out = torch.stack([target.clone().detach() for target in y_deltas_sorted])
+
+        return X_padded_seq, sorted_len, X_metas_out, y_centroids_out, y_deltas_out
+    
+    def sort_pad_collate(batch):
+        X_sequences, X_metas, y_centroids, y_deltas = zip(*batch)
+
+        #sort
+        lengths = torch.tensor([len(seq) for seq in X_sequences])
+        sorted_len, sorted_idx = lengths.sort(0, descending=True)
+
+        X_sequences_sorted = [X_sequences[i] for i in sorted_idx]
+        X_metas_sorted = [X_metas[i] for i in sorted_idx]
+        y_centroids_sorted = [y_centroids[i] for i in sorted_idx]
+        y_deltas_sorted = [y_deltas[i] for i in sorted_idx]
+
+        #pad
+        X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
 
         X_metas_out = torch.stack([target.clone().detach() for target in X_metas_sorted])
         y_centroids_out = torch.tensor(y_centroids_sorted)

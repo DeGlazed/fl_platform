@@ -219,6 +219,7 @@ class SimpleClient():
         if self.server_down.is_set():
             raise Exception("Connection to the Server is down. Cannot publish task.")
         
+        model = model.to('cpu')
         state_dict = model.state_dict()
         
         obj_name = f"local_{self.cid}_{int(time.time())}.pth"
