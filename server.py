@@ -1,8 +1,8 @@
 from fl_platform.src.server import SimpleServer
-from fl_platform.src.strategy.fed_fa import DataQualityAwareFedFA
+from fl_platform.src.strategy.fed_fa import TaxiFedFA
 import os
 
-strategy = DataQualityAwareFedFA(k=3)
+strategy = TaxiFedFA(k=6)
 
 # for kubernetes
 kafka_server = os.getenv('KAFKA_SERVER', 'localhost:9092')
@@ -12,7 +12,7 @@ print(f'Kafka server: {kafka_server}')
 print(f'Localstack server: {localstack_server}')
 
 server = SimpleServer(
-    min_clients=3,
+    min_clients=6,
     strategy=strategy,
 
     kafka_server=kafka_server,

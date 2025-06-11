@@ -39,7 +39,7 @@ class SimpleServer():
                 ):
         
         logging.basicConfig(
-            filename='server.log',  
+            # filename='server.log',  
             level=logging.INFO)
         
         self.min_clients = min_clients

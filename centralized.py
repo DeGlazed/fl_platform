@@ -289,6 +289,7 @@ def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.7):
     total_e1_loss = 0
     total_e2_loss = 0
     correct_centroids = 0
+    total_samples = 0
 
     with torch.no_grad():
         progress_bar = tqdm(dataloader, desc="Evaluating", leave=True)
