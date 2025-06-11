@@ -152,7 +152,7 @@ class SimpleServer():
                 torch.save(sampled_params, 'snapshot_0.params')
                 self.current_global_state_dict = sampled_params
 
-                init_model_params_timestamp = time.time()
+                self.current_global_timestamp = time.time()
 
                 self.s3_client.upload_file(
                     'snapshot_0.params',
@@ -163,7 +163,7 @@ class SimpleServer():
 
                 for client_id in clinet_ids:
                     logging.debug(f"Sending initial parameters to client {client_id}...")
-                    self.client_models_timestamps[client_id] = init_model_params_timestamp
+                    self.client_models_timestamps[client_id] = self.current_global_timestamp
                     task_message = Message(
                                             cid=client_id,
                                             type=MessageType.TASK,
