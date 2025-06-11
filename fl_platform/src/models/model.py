@@ -69,53 +69,43 @@ class DropoffLSTM(nn.Module):
         self.hidden_size = 128
         self.input_size = 3
         self.num_layers = 3
-        self.metadata_features = 4
-        self.metadata_extracted = 32
 
         self.arrival_clusters = 300
-
-        self.metadata_encoder = nn.Linear(self.metadata_features, self.metadata_extracted)
+        
         self.lstm = nn.LSTM(self.input_size, self.hidden_size, self.num_layers, batch_first=True)
         self.attention = Attention(self.hidden_size)
 
-        self.arrival_zone_classifier = nn.Linear(self.hidden_size + self.metadata_extracted, self.arrival_clusters)
-
-        self.coord_extract = nn.Sequential(
-            nn.Linear(self.hidden_size + self.metadata_extracted + self.arrival_clusters, 64),
+        self.attention_encoder = nn.Sequential(
+            nn.Linear(self.hidden_size, 128),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(64, 2)
+            nn.Linear(128, 512)
         )
 
-    def forward(self, X_seq, X_seq_lengths, X_meta):
+        self.arrival_zone_classifier = nn.Linear(512, self.arrival_clusters)
 
-        meta = self.metadata_encoder(X_meta)
+    def forward(self, X_seq, X_seq_lengths):
 
         packed_X_seq = nn.utils.rnn.pack_padded_sequence(X_seq, X_seq_lengths.cpu(), batch_first=True, enforce_sorted=True)
         packed_lstm_out, _ = self.lstm(packed_X_seq)
         
         lstm_out, lstm_len = nn.utils.rnn.pad_packed_sequence(packed_lstm_out, batch_first=True)
-    
-        seq_data = self.attention(lstm_out, lstm_len)
+        attention_data = self.attention(lstm_out, lstm_len)
 
-        x = torch.cat([seq_data, meta], dim=1)
+        encoded_attention = self.attention_encoder(attention_data)
         
-        arrival_zone = F.softmax(self.arrival_zone_classifier(x), dim=1)
+        arrival_zone = F.softmax(self.arrival_zone_classifier(encoded_attention), dim=1)
 
-        x = torch.cat([x, arrival_zone], dim=1)
-
-        lat_lon = self.coord_extract(x)
-
-        return arrival_zone, lat_lon
+        return arrival_zone
 
 class HaversineLoss(nn.Module):
     def __init__(self):
         super(HaversineLoss, self).__init__()
-        self.R = 6371000.0
-    
-    def forward(self, lat_lon_pred, lat_lon_true):
-        lat1, lon1 = lat_lon_pred[:, 0], lat_lon_pred[:, 1]
-        lat2, lon2 = lat_lon_true[:, 0], lat_lon_true[:, 1]
+
+    def compute_distance(self, point1, point2):
+        R = 6371000.0
+        lat1, lon1 = point1[:, 0], point1[:, 1]
+        lat2, lon2 = point2[:, 0], point2[:, 1]
 
         lat1 = torch.deg2rad(lat1)
         lon1 = torch.deg2rad(lon1)
@@ -130,5 +120,38 @@ class HaversineLoss(nn.Module):
 
         a = torch.sin(delta_phi / 2) ** 2 + torch.cos(phi1) * torch.cos(phi2) * torch.sin(delta_lambda / 2) ** 2
         c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
-        haversine = self.R * c
-        return torch.mean(haversine)
+        haversine = R * c
+        return haversine
+    
+    def forward(self, lat_lon_pred, lat_lon_true):
+        return torch.mean(self.compute_distance(lat_lon_pred, lat_lon_true))
+
+class HaversineCentroidLoss(nn.Module):
+    def __init__(self):
+        super(HaversineCentroidLoss, self).__init__()
+        self.R = 6371000.0
+    
+    def forward(self, centroid_prob, centroids, lat_lon_true):
+        
+        # centroid_prob: (batch_size, num_centroids)
+        # centroids: (num_centroids, 2)
+        # lat_lon_true: (batch_size, 2)
+
+        lat_lon_true_expanded = lat_lon_true.unsqueeze(1)  # (batch_size, 1, 2)
+        centroids_expanded = centroids.unsqueeze(0)  # (1, num_centroids, 2)
+
+        lat1 = torch.deg2rad(lat_lon_true_expanded[:, :, 0])  # (batch_size, 1)
+        lon1 = torch.deg2rad(lat_lon_true_expanded[:, :, 1])  # (batch_size, 1)
+        lat2 = torch.deg2rad(centroids_expanded[:, :, 0])     # (1, num_centroids)
+        lon2 = torch.deg2rad(centroids_expanded[:, :, 1])     # (1, num_centroids)
+
+        delta_lat = lat2 - lat1
+        delta_lon = lon2 - lon1
+
+        a = torch.sin(delta_lat / 2) ** 2 + torch.cos(lat1) * torch.cos(lat2) * torch.sin(delta_lon / 2) ** 2
+        c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
+        distances = self.R * c  # (batch_size, num_centroids)
+
+        weighted_distances = torch.sum(centroid_prob * distances, dim=1)  # (batch_size,)
+
+        return torch.mean(weighted_distances)

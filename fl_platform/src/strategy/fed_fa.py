@@ -279,7 +279,7 @@ class TaxiFedFA(AbstractStrategy):
             quality_data[i] = info_data
         df = pd.DataFrame.from_dict(quality_data, orient='index')
         df_norm = (df - df.min()) / (df.max() - df.min() + 1e-8)
-        df["score"] = ( 0.5 * df_norm["spatial_diversity"] + 0.5 * (1 - df_norm["destination_diversity"]))
+        df["score"] = 0.5 * df_norm["spatial_diversity"] + 0.5 * df_norm["destination_diversity"]
 
         total_weighted_samples = 0
         weights = []
@@ -314,29 +314,6 @@ class TaxiFedFA(AbstractStrategy):
             mean_params[key] = weighted_sum
         
         return mean_params
-    
-    def evaluate(self):
-        return None
-        if len(self.info_queue) < self.k:
-            logging.debug("Eval queue not full yet")
-            return None
-        
-        asyn_eval_acc = 0.0
-        asyn_eval_loss = 0.0
-        asyn_eval_distance = 0.0
-
-        accs = [float(info['accuracy']) for info in self.info_queue]
-        distances = [float(info['distance']) for info in self.info_queue]
-        losses = [float(info['loss']) for info in self.info_queue]
-
-        weights = self.compute_weights()
-
-        for i in range(len(accs)):
-            asyn_eval_acc += weights[i] * accs[i]
-            asyn_eval_loss += weights[i] * losses[i]
-            asyn_eval_distance += weights[i] * distances[i]
-
-        return { "accuracy": asyn_eval_acc, "loss": asyn_eval_loss, "distance": asyn_eval_distance }
 
     def get_number_of_initial_client_samples(self) -> int:
         return self.k

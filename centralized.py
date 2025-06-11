@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader
 from fl_platform.src.data.dataset import TaxiPortoDataset, GeoLifeMobilityDataset, get_client_dataset_split_following_normal_distribution
-from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, DropoffLSTM, HaversineLoss
+from fl_platform.src.models.model import SimpleLSTM, ConvLSTM, DropoffLSTM, HaversineLoss, HaversineCentroidLoss
 import pickle
 import torch
 from torch import nn
@@ -216,111 +216,126 @@ def test(model, dataloader, snapshots_path):
     # torch.cuda.empty_cache()  # Clear GPU memory
 
 
-def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 10.0, b = 0.01, epochs = 5):
+def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 0.7, epochs = 3):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on device:", device)
     model.to(device)
     dest_centroids = dest_centroids.to(device)
 
-    ce_criterion = nn.CrossEntropyLoss().to(device)
-    hav_criterion = HaversineLoss().to(device)
+    hav_location_criterion = HaversineLoss().to(device)
+    hav_centroid_criterion = HaversineCentroidLoss().to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     for epoch in range(epochs):
         model.train()
         total_loss = 0
+        total_e1_loss = 0
+        total_e2_loss = 0
 
         print(f"\nEpoch {epoch+1}/{epochs}")
         progress_bar = tqdm(dataloader, desc="Training", leave=True)
 
         for batch in progress_bar:
-            X_seq, lengths, X_metas, y_centroids, y_deltas = batch
+            X_seq, lengths, _ , y_centroids, y_deltas = batch
+            X_seq, lengths, y_centroids, y_deltas = X_seq.to(device), lengths.to(device), y_centroids.to(device), y_deltas.to(device)
+            dest_centroids = dest_centroids.to(device)
 
-            X_seq, lengths, X_metas, y_centroids, y_deltas = X_seq.to(device), lengths.to(device), X_metas.to(device), y_centroids.to(device), y_deltas.to(device)
-
-            y_lat_lon = dest_centroids[y_centroids] + y_deltas
+            y_lat_lon_true = dest_centroids[y_centroids] + y_deltas
 
             optimizer.zero_grad()
-            y_hat_centroids, y_hat_lat_lon = model(X_seq, lengths, X_metas)
+            y_hat = model(X_seq, lengths)
 
-            ce_loss = ce_criterion(y_hat_centroids, y_centroids)
-            hav_loss = hav_criterion(y_hat_lat_lon, y_lat_lon) / 1000.0
-            loss = a * ce_loss + b * hav_loss
+            y_lat_lon_predicted = torch.sum(dest_centroids.unsqueeze(0) * y_hat.unsqueeze(-1), dim=1)
+
+            e1_loss = hav_location_criterion(y_lat_lon_predicted, y_lat_lon_true)
+            e2_loss = hav_centroid_criterion(y_hat, dest_centroids, y_lat_lon_true)
+
+            loss = a * e1_loss + (1 - a) * e2_loss
 
             loss.backward()
             optimizer.step()
 
             batch_loss = loss.item()
             total_loss += batch_loss
+            total_e1_loss += e1_loss.item()
+            total_e2_loss += e2_loss.item()
 
             progress_bar.set_postfix({
-                "batch_loss": f"{batch_loss:.4f}"
+                "batch_loss": f"{batch_loss:.4f}",
+                "e1_loss": f"{e1_loss.item():.4f}",
+                "e2_loss": f"{e2_loss.item():.4f}"
             })
 
         epoch_loss = total_loss / len(dataloader)
+        epoch_e1_loss = total_e1_loss / len(dataloader)
+        epoch_e2_loss = total_e2_loss / len(dataloader)
 
-        print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}")
+        print(f"Epoch {epoch+1} Completed | Loss: {epoch_loss:.4f}, E1 Loss: {epoch_e1_loss:.4f}, E2 Loss: {epoch_e2_loss:.4f}")
     return total_loss / len(dataloader)
 
-def eval_taxi_dataset(model, dataloader, dest_centroids, a = 1.0, b = 2.0):
+def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.7):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Evaluating on device:", device)
     model.to(device)
     model.eval()
     dest_centroids = dest_centroids.to(device)
 
-    ce_criterion = nn.CrossEntropyLoss().to(device)
-    hav_criterion = HaversineLoss().to(device)
+    hav_location_criterion = HaversineLoss().to(device)
+    hav_centroid_criterion = HaversineCentroidLoss().to(device)
 
     total_loss = 0
-    total_ce_loss = 0
-    total_hav_loss = 0
+    total_e1_loss = 0
+    total_e2_loss = 0
     correct_centroids = 0
-    total_samples = 0
 
     with torch.no_grad():
         progress_bar = tqdm(dataloader, desc="Evaluating", leave=True)
         
         for batch in progress_bar:
-            X_seq, lengths, X_metas, y_centroids, y_deltas = batch
-            X_seq, lengths, X_metas, y_centroids, y_deltas = X_seq.to(device), lengths.to(device), X_metas.to(device), y_centroids.to(device), y_deltas.to(device)
+            X_seq, lengths, _ , y_centroids, y_deltas = batch
+            X_seq, lengths, y_centroids, y_deltas = X_seq.to(device), lengths.to(device), y_centroids.to(device), y_deltas.to(device)
+            dest_centroids = dest_centroids.to(device)
 
-            y_hat_centroids, y_hat_lat_lon = model(X_seq, lengths, X_metas)
-            y_lat_lon = dest_centroids[y_centroids] + y_deltas
+            y_lat_lon_true = dest_centroids[y_centroids] + y_deltas
 
-            ce_loss = ce_criterion(y_hat_centroids, y_centroids)
-            hav_loss = hav_criterion(y_hat_lat_lon, y_lat_lon) / 1000.0
-            loss = a* ce_loss + b * hav_loss
+            y_hat = model(X_seq, lengths)
+
+            y_lat_lon_predicted = torch.sum(dest_centroids.unsqueeze(0) * y_hat.unsqueeze(-1), dim=1)
+
+            e1_loss = hav_location_criterion(y_lat_lon_predicted, y_lat_lon_true)
+            e2_loss = hav_centroid_criterion(y_hat, dest_centroids, y_lat_lon_true)
+
+            loss = a * e1_loss + (1 - a) * e2_loss
 
             total_loss += loss.item()
-            total_ce_loss += ce_loss.item()
-            total_hav_loss += hav_loss.item()
+            total_e1_loss += e1_loss.item()
+            total_e2_loss += e2_loss.item()
 
-            _, predicted_centroids = y_hat_centroids.max(1)
+            _, predicted_centroids = y_hat.max(1)
             correct_centroids += predicted_centroids.eq(y_centroids).sum().item()
             total_samples += y_centroids.size(0)
 
             progress_bar.set_postfix({
                 "eval_loss": f"{loss.item():.4f}",
                 "accuracy": f"{correct_centroids/total_samples:.4f}",
-                "avg_haversine_dist": f"{hav_loss.item():.4f}"
+                "avg_e1_loss": f"{total_e1_loss/len(dataloader):.4f}",
+                "avg_e2_loss": f"{total_e2_loss/len(dataloader):.4f}"
             })
 
     avg_loss = total_loss / len(dataloader)
-    avg_ce_loss = total_ce_loss / len(dataloader)
-    avg_hav_loss = total_hav_loss / len(dataloader)
+    avg_e1_loss = total_e1_loss / len(dataloader)
+    avg_e2_loss = total_e2_loss / len(dataloader)
     centroid_accuracy = 100 * correct_centroids / total_samples
-
 
     print(f"Evaluation Results:")
     print(f"Total Loss: {avg_loss:.4f}")
-    print(f"CE Loss: {avg_ce_loss:.4f}")
-    print(f"Haversine Loss: {avg_hav_loss:.4f}")
+    print(f"Hav Dist: {avg_e1_loss:.4f}")
+    print(f"Dist From Centroids: {avg_e2_loss:.4f}")
     print(f"Centroid Accuracy: {centroid_accuracy:.2f}%")
 
-    return avg_loss, avg_ce_loss, avg_hav_loss, centroid_accuracy
+    return avg_loss, avg_e1_loss, avg_e2_loss, centroid_accuracy
 
 if __name__ == "__main__":
 
@@ -342,18 +357,9 @@ if __name__ == "__main__":
         collate_fn=TaxiPortoDataset.seed_random_sort_pad_collate
     )
 
-    dest_centroids_df = pd.read_csv("fl_platform\src\data\processed\porto_end_points.csv")
+    dest_centroids_df = pd.read_csv("fl_platform\src\data\processed\end_points_centroids_k300.csv")
     dest_centroids = torch.tensor(dest_centroids_df[['latitude', 'longitude']].values, dtype=torch.float32)
 
-    configs = [
-        {"lr": 1e-3, "a": 1.0, "b": 1.0, "epochs": 3},
-        {"lr": 1e-3, "a": 1.0, "b": 2.0, "epochs": 3},
-        {"lr": 1e-3, "a": 1.0, "b": 3.0, "epochs": 3},
-        {"lr": 5e-4, "a": 1.0, "b": 4.0, "epochs": 3},
-    ]
-
-    for config in configs:
-        print(f"Training with config: {config}")
-        model = DropoffLSTM()
-        train_taxi_dataset(model, dataloader, dest_centroids, **config)
-        eval_taxi_dataset(model, test_dataloader, dest_centroids, config['a'], config['b'])
+    model = DropoffLSTM()
+    train_taxi_dataset(model, dataloader, dest_centroids, lr=1e-3, a=0.5, epochs=5)
+    eval_taxi_dataset(model, test_dataloader, dest_centroids, a=0.5)

@@ -60,15 +60,7 @@ if(__name__ == "__main__"):
     stats = compute_taxi_quality(dataset)
     print(stats)
 
-    # test_dataset = TaxiPortoDataset("fl_platform\src\data\processed\\test_taxi_porto.pkl")
-    # test_dataloader = torch.utils.data.DataLoader(
-    #     test_dataset,
-    #     batch_size=64,
-    #     shuffle=False,
-    #     collate_fn=TaxiPortoDataset.seed_random_sort_pad_collate
-    # )
-
-    dest_centroids_df = pd.read_csv("fl_platform\src\data\processed\porto_end_points.csv")
+    dest_centroids_df = pd.read_csv("fl_platform\src\data\processed\end_points_centroids_k300.csv")
     dest_centroids = torch.tensor(dest_centroids_df[['latitude', 'longitude']].values, dtype=torch.float32)
 
     model = DropoffLSTM()
