@@ -36,7 +36,6 @@ class ConvLSTM(nn.Module):
         _, (hn, _) = self.lstm(packed)
         return self.classifier(hn[-1])
 
-# inspired
 # https://github.com/chrisvdweth/ml-toolkit/blob/master/pytorch/models/text/classifier/rnn.py
 # https://drlee.io/revolutionizing-time-series-prediction-with-lstm-with-the-attention-mechanism-090833a19af9
 # https://medium.com/@eugenesh4work/attention-mechanism-for-lstm-used-in-a-sequence-to-sequence-task-be1d54919876
@@ -62,39 +61,60 @@ class Attention(nn.Module):
 
         context = torch.sum(lstm_out * attention_weights.unsqueeze(-1), dim=1)
         return context
-            
-class DropoffLSTM(nn.Module):
-    def __init__(self):
-        super(DropoffLSTM, self).__init__()
-        self.hidden_size = 128
-        self.input_size = 3
-        self.num_layers = 3
 
-        self.arrival_clusters = 300
+class Residual(nn.Module):
+    def __init__(self, dim):
+        super(Residual, self).__init__()
+        self.layer = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.LayerNorm(dim),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(dim, dim),
+            nn.LayerNorm(dim)
+        )
         
-        self.lstm = nn.LSTM(self.input_size, self.hidden_size, self.num_layers, batch_first=True)
+    def forward(self, x):
+        return F.relu(x + self.layer(x))
+
+
+class DropoffLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, arrival_clusters):
+        super(DropoffLSTM, self).__init__()
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+        self.num_layers = num_layers
+        self.arrival_clusters = arrival_clusters
+
+        self.embedding = nn.Linear(input_size, 16)
+        self.lstm = nn.LSTM(16, self.hidden_size, self.num_layers, batch_first=True)
+        
         self.attention = Attention(self.hidden_size)
 
-        self.attention_encoder = nn.Sequential(
-            nn.Linear(self.hidden_size, 128),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(128, 512)
-        )
+        self.residual_connection = nn.Linear(self.hidden_size, 1024)
 
-        self.arrival_zone_classifier = nn.Linear(512, self.arrival_clusters)
+        self.residual_block = Residual(1024)
+
+        self.output_layer = nn.Linear(1024, self.arrival_clusters)
+
+        self.dropout = nn.Dropout(0.1)
 
     def forward(self, X_seq, X_seq_lengths):
+        
+        X_seq = self.embedding(X_seq)
 
         packed_X_seq = nn.utils.rnn.pack_padded_sequence(X_seq, X_seq_lengths.cpu(), batch_first=True, enforce_sorted=True)
-        packed_lstm_out, _ = self.lstm(packed_X_seq)
+        packed_lstm_out, (h, c) = self.lstm(packed_X_seq)
         
         lstm_out, lstm_len = nn.utils.rnn.pad_packed_sequence(packed_lstm_out, batch_first=True)
         attention_data = self.attention(lstm_out, lstm_len)
 
-        encoded_attention = self.attention_encoder(attention_data)
-        
-        arrival_zone = F.softmax(self.arrival_zone_classifier(encoded_attention), dim=1)
+        x = self.residual_connection(attention_data)
+        x = F.relu(x)
+
+        x = self.residual_block(x)
+
+        arrival_zone = F.softmax(self.output_layer(x), dim=1)
 
         return arrival_zone
 
@@ -136,6 +156,8 @@ class HaversineCentroidLoss(nn.Module):
         # centroid_prob: (batch_size, num_centroids)
         # centroids: (num_centroids, 2)
         # lat_lon_true: (batch_size, 2)
+        centroid_prob = centroid_prob + 1e-8
+        centroid_prob = centroid_prob / torch.sum(centroid_prob, dim=1, keepdim=True)  # Normalize probabilities
 
         lat_lon_true_expanded = lat_lon_true.unsqueeze(1)  # (batch_size, 1, 2)
         centroids_expanded = centroids.unsqueeze(0)  # (1, num_centroids, 2)
