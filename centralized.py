@@ -400,7 +400,7 @@ if __name__ == "__main__":
         test_dataset,
         batch_size=32,
         shuffle=False,
-        collate_fn=TaxiPortoDataset.sort_pad_collate
+        collate_fn=TaxiPortoDataset.seed_random_sort_pad_collate
     )
 
     dest_centroids_df = pd.read_csv("fl_platform\\src\\data\\processed\\new_porto_data\\end_point_centroids_k3400.csv")
