@@ -13,23 +13,6 @@ torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 np.random.seed(42)
 
-def compute_taxi_quality(dataset) :
-    labels = set()
-    spatial_cells = set()
-    
-    for seq_tensor, _, target_centroid, _ in dataset:
-
-        labels.add(target_centroid.item())
-
-        coords = seq_tensor[:, :2]
-        for lat, lon in coords:
-            spatial_cells.add(latlon_to_cell(lat.item(), lon.item()))
-
-    return {
-        "destination_diversity": len(labels)/300,
-        "spatial_diversity": len(spatial_cells)
-    }
-
 if(__name__ == "__main__"):
     parser = argparse.ArgumentParser(description='FL Client')
     parser.add_argument('--c', type=int, default=0, help='Client ID')
@@ -55,10 +38,6 @@ if(__name__ == "__main__"):
     print(f"Loading {partition_id} partition of Taxi Porto dataset")
     data_path = f"fl_platform\src\data\processed\c{partition_id}_train_taxi_porto.pkl"
     dataset = TaxiPortoDataset(data_path)
-
-    stats = None
-    stats = compute_taxi_quality(dataset)
-    print(stats)
 
     dest_centroids_df = pd.read_csv("fl_platform\src\data\processed\end_points_centroids_k300.csv")
     dest_centroids = torch.tensor(dest_centroids_df[['latitude', 'longitude']].values, dtype=torch.float32)
@@ -150,29 +129,21 @@ if(__name__ == "__main__"):
             if(warm_runs < 5):
                 dataloader = torch.utils.data.DataLoader(
                         dataset,
-                        batch_size=64,
+                        batch_size=32,
                         shuffle=True,
                         collate_fn=TaxiPortoDataset.sort_pad_collate
                     )
+                warm_runs += 1
             else:
-                if np.random.rand() < 0.5:
-                    dataloader = torch.utils.data.DataLoader(
-                        dataset,
-                        batch_size=64,
-                        shuffle=True,
-                        collate_fn=TaxiPortoDataset.sort_pad_collate
-                    )
-                else:
-                    dataloader = torch.utils.data.DataLoader(
-                        dataset,
-                        batch_size=64,
-                        shuffle=True,
-                        collate_fn=TaxiPortoDataset.random_sort_pad_collate
-                    )
-            warm_runs += 1
+                dataloader = torch.utils.data.DataLoader(
+                    dataset,
+                    batch_size=32,
+                    shuffle=True,
+                    collate_fn=TaxiPortoDataset.random_sort_pad_collate
+                )
 
             epochs = 3
-            lr = 1e-3
+            lr = 1e-4
 
             loss = train_taxi_dataset(model, dataloader, dest_centroids, lr=lr, epochs=epochs)
 
@@ -183,9 +154,6 @@ if(__name__ == "__main__"):
                 "learning_rate": lr,
                 "loss": loss
             }
-
-            if stats:
-                training_info.update(stats)
 
             client.publish_updated_model(model, training_info)
             print("Sent model")

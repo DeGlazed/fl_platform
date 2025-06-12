@@ -1,8 +1,8 @@
 from fl_platform.src.server import SimpleServer
-from fl_platform.src.strategy.fed_fa import TaxiFedFA
+from fl_platform.src.strategy.fed_fa import TimestampSizeAwareFedFA
 import os
 
-strategy = TaxiFedFA(k=6)
+strategy = TimestampSizeAwareFedFA(k=6)
 
 # for kubernetes
 kafka_server = os.getenv('KAFKA_SERVER', 'localhost:9092')
