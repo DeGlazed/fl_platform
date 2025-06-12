@@ -12,6 +12,8 @@ from collections import OrderedDict
 import torch
 import os
 import ssl
+import psutil
+import requests
 
 class SimpleServer():
     def __init__(self, 
@@ -130,6 +132,8 @@ class SimpleServer():
         heartbeat_producer_thread = threading.Thread(target=self.start_heartbeat_producer, args=(), daemon=True)
         heartbeat_producer_thread.start()
 
+        process_monitor_thread = threading.Thread(target=self.process_monitor, args=(), daemon=True)
+        process_monitor_thread.start()
 
         just_started = True
         while not self.server_stop.is_set():
@@ -148,6 +152,7 @@ class SimpleServer():
                 
                 with self.initial_params_lock:
                     sampled_params = random.choice(self.initial_params)
+                    self.initial_params = None
                 logging.debug(f"Sampling initial parameters. Choice is {sampled_params}...")
                 torch.save(sampled_params, 'snapshot_0.params')
                 self.current_global_state_dict = sampled_params
@@ -427,7 +432,8 @@ class SimpleServer():
                             if not isinstance(state_dict, OrderedDict):
                                 raise ValueError("The loaded state_dict is not an OrderedDict.")
                             with self.initial_params_lock:
-                                self.initial_params.append(state_dict)
+                                if(self.initial_params is not None):
+                                    self.initial_params.append(state_dict)
                             os.remove("init_" + client_id + ".params")
 
                             logging.info(f"Client {client_id} connected.")
@@ -518,10 +524,26 @@ class SimpleServer():
         while not self.server_stop.is_set():
             for client_id in self.client_manager.get_all_clients():
                 last_seen = self.client_manager.get_client_last_seen(client_id)
-                if time.time() - last_seen > 10:
+                if time.time() - last_seen > 120:
                     logging.warning(f"Client {client_id} has not sent a heartbeat in a while. Last seen at {last_seen}.")
                     with self.client_pool_lock:
                         if self.client_manager.get_client_state(client_id) == ClientState.BUSY:
                             self.client_pool += 1
                         self.client_manager.remove_client(client_id)
             time.sleep(2)
+            
+    def process_monitor(self):
+        process = psutil.Process()
+        pushgateway_server=f'http://pushgateway.deglazedrt.work:9091'
+        while not self.server_stop.is_set():
+            memory_info = process.memory_info()
+            # logging.info(f"Process memory usage: {memory_info.rss / 1024 ** 2} MiB")
+            metrics = f"""
+            server_memory{{client="server"}} {memory_info.rss / 1024 ** 2}
+            """
+
+            response = requests.post(
+                pushgateway_server + f"/metrics/job/server",
+                data=metrics.encode('utf-8')
+            )
+            time.sleep(3)

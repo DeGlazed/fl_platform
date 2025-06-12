@@ -50,6 +50,10 @@ spec:
           value: "/bitnami/kafka/config/certs/kafka.truststore.jks"
         - name: KAFKA_CFG_SSL_TRUSTSTORE_PASSWORD
           value: "password"
+        - name: KAFKA_CFG_CONNECTIONS_MAX_IDLE_MS
+          value: "1800000"
+        - name: KAFKA_SOCKET_KEEPALIVE_ENABLED
+          value: "true"
         volumeMounts:
         - name: kafka-certs
           mountPath: /bitnami/kafka/config/certs

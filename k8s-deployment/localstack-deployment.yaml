@@ -31,12 +31,7 @@ spec:
         volumeMounts:
         - name: localstack-data
           mountPath: /var/lib/localstack
-        - name: docker-socket
-          mountPath: /var/run/docker.sock
       volumes:
       - name: localstack-data
         persistentVolumeClaim:
           claimName: localstack-pvc
-      - name: docker-socket
-        hostPath:
-          path: /var/run/docker.sock

@@ -16,6 +16,11 @@ spec:
       containers:
         - name: server
           image: deglazed/server-demo:taxi
+          resources:
+            requests:
+              memory: "512Mi"
+            limits:
+              memory: "1Gi"
           env:
             - name: KAFKA_SERVER
               value: "kafka:9092"
