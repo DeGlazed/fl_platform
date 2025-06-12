@@ -42,24 +42,24 @@ if(__name__ == "__main__"):
     dest_centroids_df = pd.read_csv("fl_platform\\src\\data\\processed\\new_porto_data\\end_point_centroids_k3400.csv")
     dest_centroids = torch.tensor(dest_centroids_df[['latitude', 'longitude']].values, dtype=torch.float32)
 
-    model = DropoffLSTM()
+    model = DropoffLSTM(2, 512, 1, len(dest_centroids))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
 
-    # # for docker
-    # # kafka_server='localhost:9092', #PLAINTEXT
-    # kafka_server='localhost:9095', #SSL
-    # localstack_server='http://localhost:4566'
+    # for docker
+    # kafka_server='localhost:9092', #PLAINTEXT
+    kafka_server='localhost:9095', #SSL
+    localstack_server='http://localhost:4566'
 
     # # for kubernetes
     # # minikube
     # kafka_server='localhost:30095', #SSL
     # localstack_server='http://localhost:30566'
 
-    # GCE
-    server_host = 'deglazedrt.work'
-    kafka_server=f'kafka.{server_host}:9095', #SSL
-    localstack_server=f'http://localstack.{server_host}:4566'
+    # # GCE
+    # server_host = 'deglazedrt.work'
+    # kafka_server=f'kafka.{server_host}:9095', #SSL
+    # localstack_server=f'http://localstack.{server_host}:4566'
 
     client = SimpleClient(
         model=model,

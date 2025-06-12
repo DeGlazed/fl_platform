@@ -62,7 +62,7 @@ class CustomEvaluator(SimpleEvaluator):
         avg_loss, avg_e1_loss, avg_e2_loss, centroid_accuracy = eval_taxi_dataset(self.model, self.test_loader, self.dest_centroids)
         return {"loss": avg_e1_loss, "accuracy": centroid_accuracy}
 
-test_dataset = TaxiPortoDataset("fl_platform\src\data\processed\\test_taxi_porto.pkl")
+test_dataset = TaxiPortoDataset("fl_platform\\src\\data\\processed\\new_porto_data\\new_porto_test_data.pkl")
 test_dataloader = torch.utils.data.DataLoader(
     test_dataset,
     batch_size=64,
@@ -70,27 +70,27 @@ test_dataloader = torch.utils.data.DataLoader(
     collate_fn=TaxiPortoDataset.seed_random_sort_pad_collate
 )
 
-dest_centroids_df = pd.read_csv("fl_platform\src\data\processed\end_points_centroids_k300.csv")
+dest_centroids_df = pd.read_csv("fl_platform\\src\\data\\processed\\new_porto_data\\end_point_centroids_k3400.csv")
 dest_centroids = torch.tensor(dest_centroids_df[['latitude', 'longitude']].values, dtype=torch.float32)
 
-model = DropoffLSTM()
+model = DropoffLSTM(2, 512, 1, len(dest_centroids))
 
-# # for docker
-# # kafka_server='localhost:9092', #PLAINTEXT
-# kafka_server='localhost:9095', #SSL
-# localstack_server='http://localhost:4566'
-# pushgateway_server='http://localhost:9091'
+# for docker
+# kafka_server='localhost:9092', #PLAINTEXT
+kafka_server='localhost:9095', #SSL
+localstack_server='http://localhost:4566'
+pushgateway_server='http://localhost:9091'
 
 # # for kubernetes
 # kafka_server='localhost:30095', #SSL
 # localstack_server='http://localhost:30566'
 # pushgateway_server='http://localhost:30091'
 
-# GCE
-server_host = 'deglazedrt.work'
-kafka_server=f'kafka.{server_host}:9095', #SSL
-localstack_server=f'http://localstack.{server_host}:4566'
-pushgateway_server=f'http://pushgateway.{server_host}:9091'
+# # GCE
+# server_host = 'deglazedrt.work'
+# kafka_server=f'kafka.{server_host}:9095', #SSL
+# localstack_server=f'http://localstack.{server_host}:4566'
+# pushgateway_server=f'http://pushgateway.{server_host}:9091'
 
 # evaluator = SimpleEvaluator(
 #     model=model,
