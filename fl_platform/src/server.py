@@ -156,6 +156,7 @@ class SimpleServer():
                 logging.debug(f"Sampling initial parameters. Choice is {sampled_params}...")
                 torch.save(sampled_params, 'snapshot_0.params')
                 self.current_global_state_dict = sampled_params
+                sampled_params=None
 
                 self.current_global_timestamp = time.time()
 
@@ -226,7 +227,8 @@ class SimpleServer():
                         logging.info(f"Received local parameters from client {client_id}.")
                         self.client_manager.set_finished(client_id)
                         number_of_next_samples, new_global_state_dict = self.strategy.aggregate(state_dict, training_info)
-
+                        state_dict = None
+                        
                         result = self.strategy.evaluate()
                         if result:
                             logging.info(f"Async evaluation aggregation result: {result}")
@@ -236,6 +238,7 @@ class SimpleServer():
                                 self.client_pool += number_of_next_samples
                             self.current_global_state_dict = new_global_state_dict
                             self.current_global_timestamp = time.time()
+                            new_global_state_dict = None
                             
                 number_of_ready_clients = len(self.client_manager.get_all_ready_clients())
                 
@@ -434,6 +437,7 @@ class SimpleServer():
                             with self.initial_params_lock:
                                 if(self.initial_params is not None):
                                     self.initial_params.append(state_dict)
+                            state_dict = None
                             os.remove("init_" + client_id + ".params")
 
                             logging.info(f"Client {client_id} connected.")
