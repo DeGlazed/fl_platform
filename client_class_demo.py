@@ -36,10 +36,10 @@ if(__name__ == "__main__"):
     '''
 
     print(f"Loading {partition_id} partition of Taxi Porto dataset")
-    data_path = f"fl_platform\src\data\processed\c{partition_id}_train_taxi_porto.pkl"
+    data_path = f"fl_platform\\src\\data\\processed\\new_porto_data\\new_porto_train_data_part_{partition_id}_{num_partitions}.pkl"
     dataset = TaxiPortoDataset(data_path)
 
-    dest_centroids_df = pd.read_csv("fl_platform\src\data\processed\end_points_centroids_k300.csv")
+    dest_centroids_df = pd.read_csv("fl_platform\\src\\data\\processed\\new_porto_data\\end_point_centroids_k3400.csv")
     dest_centroids = torch.tensor(dest_centroids_df[['latitude', 'longitude']].values, dtype=torch.float32)
 
     model = DropoffLSTM()
