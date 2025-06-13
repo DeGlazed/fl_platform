@@ -110,8 +110,8 @@ class TimestampSizeAwareFedFA(AbstractStrategy):
         timestamp_min, timestamp_max = min(timestamps), max(timestamps)
         sample_min, sample_max = min(sample_sizes), max(sample_sizes)
 
-        norm_timestamps = [(t - timestamp_min) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
-        norm_samples = [(s - sample_min) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
+        norm_timestamps = [(t - timestamp_min + 1e-8) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
+        norm_samples = [(s - sample_min + 1e-8) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
         
         for i in range(len(self.info_queue)):
             weighted_avg = 0.5*norm_timestamps[i] + 0.5*norm_samples[i]
@@ -191,8 +191,8 @@ class DataQualityAwareFedFA(AbstractStrategy):
         timestamp_min, timestamp_max = min(timestamps), max(timestamps)
         sample_min, sample_max = min(sample_sizes), max(sample_sizes)
 
-        norm_timestamps = [(t - timestamp_min) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
-        norm_samples = [(s - sample_min) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
+        norm_timestamps = [(t - timestamp_min + 1e-8) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
+        norm_samples = [(s - sample_min + 1e-8) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
         quality_weights = [df["score"].iloc[i] for i in range(len(self.info_queue))]
 
         for i in range(len(self.info_queue)):
@@ -290,8 +290,8 @@ class TaxiFedFA(AbstractStrategy):
         timestamp_min, timestamp_max = min(timestamps), max(timestamps)
         sample_min, sample_max = min(sample_sizes), max(sample_sizes)
 
-        norm_timestamps = [(t - timestamp_min) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
-        norm_samples = [(s - sample_min) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
+        norm_timestamps = [(t - timestamp_min + 1e-8) / (timestamp_max - timestamp_min + 1e-8) for t in timestamps]
+        norm_samples = [(s - sample_min + 1e-8) / (sample_max - sample_min + 1e-8) for s in sample_sizes]
         quality_weights = [df["score"].iloc[i] for i in range(len(self.info_queue))]
 
         for i in range(len(self.info_queue)):

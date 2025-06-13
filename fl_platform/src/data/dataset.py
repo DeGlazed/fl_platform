@@ -205,6 +205,15 @@ class TaxiPortoDataset(Dataset):
 
         return x_seq_array
     
+    def _normalize(self, meta):
+        meta_array = np.array(meta, dtype=np.float32)
+
+        meta_array[0] = (meta_array[0] - 1) / 11
+        meta_array[1] = (meta_array[1] - 1) / 30
+        meta_array[2] = meta_array[2] / 23
+
+        return meta_array
+
     def __len__(self):
         return len(self.data)
 
@@ -212,16 +221,18 @@ class TaxiPortoDataset(Dataset):
         item = self.data[idx]
         
         X_seq = item[0]
-        y = item[1]
-        y_centroid = item[2]
+        meta = item[1]
+        y = item[2]
+        y_centroid = item[3]
 
         X_seq_standardized = self._standardize(X_seq)
+        meta_normalized = self._normalize(meta)
 
-        return torch.tensor(X_seq_standardized, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(y_centroid, dtype=torch.long)
+        return torch.tensor(X_seq_standardized, dtype=torch.float32), torch.tensor(meta_normalized, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(y_centroid, dtype=torch.long)
 
     @staticmethod
     def random_sort_pad_collate(batch):
-        X_sequences, y, y_centroids = zip(*batch)
+        X_sequences, meta, y, y_centroids = zip(*batch)
 
         #random
         X_random_sequences = []
@@ -234,42 +245,46 @@ class TaxiPortoDataset(Dataset):
         sorted_len, sorted_idx = lengths.sort(0, descending=True)
 
         X_sequences_sorted = [X_random_sequences[i] for i in sorted_idx]
+        meta_sorted = [meta[i] for i in sorted_idx]
         y_centroids_sorted = [y_centroids[i] for i in sorted_idx]
         y_sorted = [y[i] for i in sorted_idx]
 
         #pad
         X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
 
+        meta_out = torch.stack([target.clone().detach() for target in meta_sorted])
         y_centroids_out = torch.tensor(y_centroids_sorted)
         y_out = torch.stack([target.clone().detach() for target in y_sorted])
 
-        return X_padded_seq, sorted_len, y_out, y_centroids_out
+        return X_padded_seq, sorted_len, meta_out, y_out, y_centroids_out
     
     def sort_pad_collate(batch):
-        X_sequences, y, y_centroids = zip(*batch)
+        X_sequences, meta, y, y_centroids = zip(*batch)
 
         #sort
         lengths = torch.tensor([len(seq) for seq in X_sequences])
         sorted_len, sorted_idx = lengths.sort(0, descending=True)
 
         X_sequences_sorted = [X_sequences[i] for i in sorted_idx]
+        meta_sorted = [meta[i] for i in sorted_idx]
         y_centroids_sorted = [y_centroids[i] for i in sorted_idx]
         y_sorted = [y[i] for i in sorted_idx]
 
         #pad
         X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
 
+        meta_out = torch.stack([target.clone().detach() for target in meta_sorted])
         y_centroids_out = torch.tensor(y_centroids_sorted)
         y_out = torch.stack([target.clone().detach() for target in y_sorted])
 
-        return X_padded_seq, sorted_len, y_out, y_centroids_out
+        return X_padded_seq, sorted_len, meta_out, y_out, y_centroids_out
 
     def seed_random_sort_pad_collate(batch):
         torch.manual_seed(42)
         torch.cuda.manual_seed(42)
         np.random.seed(42)
-        
-        X_sequences, y, y_centroids = zip(*batch)
+
+        X_sequences, meta, y, y_centroids = zip(*batch)
 
         #random
         X_random_sequences = []
@@ -282,16 +297,18 @@ class TaxiPortoDataset(Dataset):
         sorted_len, sorted_idx = lengths.sort(0, descending=True)
 
         X_sequences_sorted = [X_random_sequences[i] for i in sorted_idx]
+        meta_sorted = [meta[i] for i in sorted_idx]
         y_centroids_sorted = [y_centroids[i] for i in sorted_idx]
         y_sorted = [y[i] for i in sorted_idx]
 
         #pad
         X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
 
+        meta_out = torch.stack([target.clone().detach() for target in meta_sorted])
         y_centroids_out = torch.tensor(y_centroids_sorted)
         y_out = torch.stack([target.clone().detach() for target in y_sorted])
 
-        return X_padded_seq, sorted_len, y_out, y_centroids_out
+        return X_padded_seq, sorted_len, meta_out, y_out, y_centroids_out
 
 if __name__ == "__main__":
     data_path = "processed/porto_dataset.pkl"

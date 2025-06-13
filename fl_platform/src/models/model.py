@@ -86,12 +86,13 @@ class DropoffLSTM(nn.Module):
         self.num_layers = num_layers
         self.arrival_clusters = arrival_clusters
 
-        self.embedding = nn.Linear(input_size, 16)
-        self.lstm = nn.LSTM(16, self.hidden_size, self.num_layers, batch_first=True)
+        self.embedding = nn.Linear(3, 16)
+
+        self.lstm = nn.LSTM(input_size, self.hidden_size, self.num_layers, batch_first=True)
         
         self.attention = Attention(self.hidden_size)
 
-        self.residual_connection = nn.Linear(self.hidden_size, 1024)
+        self.residual_connection = nn.Linear(self.hidden_size + 16, 1024)
 
         self.residual_block = Residual(1024)
 
@@ -99,9 +100,8 @@ class DropoffLSTM(nn.Module):
 
         self.dropout = nn.Dropout(0.1)
 
-    def forward(self, X_seq, X_seq_lengths):
-        
-        X_seq = self.embedding(X_seq)
+    def forward(self, X_seq, X_seq_lengths, meta):
+        meta = F.relu(self.embedding(meta))
 
         packed_X_seq = nn.utils.rnn.pack_padded_sequence(X_seq, X_seq_lengths.cpu(), batch_first=True, enforce_sorted=True)
         packed_lstm_out, (h, c) = self.lstm(packed_X_seq)
@@ -109,7 +109,9 @@ class DropoffLSTM(nn.Module):
         lstm_out, lstm_len = nn.utils.rnn.pad_packed_sequence(packed_lstm_out, batch_first=True)
         attention_data = self.attention(lstm_out, lstm_len)
 
-        x = self.residual_connection(attention_data)
+        concatenaed_data = torch.cat((attention_data, meta), dim=1)
+
+        x = self.residual_connection(concatenaed_data)
         x = F.relu(x)
 
         x = self.residual_block(x)
@@ -124,6 +126,12 @@ class HaversineLoss(nn.Module):
 
     def compute_distance(self, point1, point2):
         R = 6371000.0
+
+        point1 = torch.clamp(point1, min=torch.tensor([-90.0, -180.0]).to(point1.device),
+                                    max=torch.tensor([90.0, 180.0]).to(point1.device))
+        point2 = torch.clamp(point2, min=torch.tensor([-90.0, -180.0]).to(point2.device),
+                                    max=torch.tensor([90.0, 180.0]).to(point2.device))
+        
         lat1, lon1 = point1[:, 0], point1[:, 1]
         lat2, lon2 = point2[:, 0], point2[:, 1]
 
@@ -139,8 +147,11 @@ class HaversineLoss(nn.Module):
         delta_lambda = lon2 - lon1
 
         a = torch.sin(delta_phi / 2) ** 2 + torch.cos(phi1) * torch.cos(phi2) * torch.sin(delta_lambda / 2) ** 2
-        c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
+        a = torch.clamp(a, min=0.0, max=1.0)
+        c = 2 * torch.atan2(torch.sqrt(a + 1e-8), torch.sqrt(1 - a + 1e-8))
         haversine = R * c
+
+        haversine = torch.clamp(haversine, min=0.0, max=R)
         return haversine
     
     def forward(self, lat_lon_pred, lat_lon_true):
@@ -171,8 +182,10 @@ class HaversineCentroidLoss(nn.Module):
         delta_lon = lon2 - lon1
 
         a = torch.sin(delta_lat / 2) ** 2 + torch.cos(lat1) * torch.cos(lat2) * torch.sin(delta_lon / 2) ** 2
-        c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
+        c = 2 * torch.atan2(torch.sqrt(a + 1e-8), torch.sqrt(1 - a + 1e-8))
         distances = self.R * c  # (batch_size, num_centroids)
+
+        distances = torch.clamp(distances, min=0.0, max=self.R)
 
         weighted_distances = torch.sum(centroid_prob * distances, dim=1)  # (batch_size,)
 

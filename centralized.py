@@ -220,17 +220,18 @@ def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 0.5, ep
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training on device:", device)
+    
     model.to(device)
+    model.train()
+
     dest_centroids = dest_centroids.to(device)
 
     hav_location_criterion = HaversineLoss().to(device)
     hav_centroid_criterion = HaversineCentroidLoss().to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, eps=1e-8)
 
     for epoch in range(epochs):
-        model.train()
         total_loss = 0
         total_e1_loss = 0
         total_e2_loss = 0
@@ -239,25 +240,26 @@ def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 0.5, ep
         progress_bar = tqdm(dataloader, desc="Training", leave=True)
 
         for batch_idx, batch in enumerate(progress_bar):
-            X_seq, lengths, y , y_centroids = batch
-            X_seq, lengths, y , y_centroids = X_seq.to(device), lengths.to(device), y.to(device), y_centroids.to(device)
+            X_seq, lengths, meta, y , y_centroids = batch
+            X_seq, lengths, meta, y , y_centroids = X_seq.to(device), lengths.to(device), meta.to(device), y.to(device), y_centroids.to(device)
             dest_centroids = dest_centroids.to(device)
 
             optimizer.zero_grad()
-            y_hat = model(X_seq, lengths)
+            y_hat = model(X_seq, lengths, meta)
 
             y_lat_lon_predicted = torch.sum(dest_centroids.unsqueeze(0) * y_hat.unsqueeze(-1), dim=1)
 
-            e1_loss = hav_location_criterion(y_lat_lon_predicted, y) / 1000.0
-            e2_loss = hav_centroid_criterion(y_hat, dest_centroids, y) /1000.0
+            y_lat_lon_predicted = torch.clamp(y_lat_lon_predicted, 
+                                    min=torch.tensor([-90.0, -180.0]).to(device),
+                                    max=torch.tensor([90.0, 180.0]).to(device))
+
+            e1_loss = hav_location_criterion(y_lat_lon_predicted, y) / 10000.0
+            e2_loss = hav_centroid_criterion(y_hat, dest_centroids, y) /10000.0
 
             loss = (a * e1_loss + (1 - a) * e2_loss)
 
-            if batch_idx < 3:
-                print(f"Batch {batch_idx}: e1_loss={e1_loss.item():.6f}, e2_loss={e2_loss.item():.6f}")
-                print(f"y_hat stats: min={y_hat.min().item():.6f}, max={y_hat.max().item():.6f}")
-                print(f"y_hat sum: {y_hat.sum(dim=1).mean().item():.6f} (should be ~1.0)")
-
+            if torch.isnan(loss) or torch.isinf(loss):
+                print(f"NaN/Inf in final loss at batch {batch_idx}: {loss.item()}")
 
             loss.backward()
 
@@ -294,6 +296,7 @@ def train_taxi_dataset(model, dataloader, dest_centroids, lr = 1e-3, a = 0.5, ep
     dataloader_length = len(dataloader)
     
     del X_seq 
+    del meta
     del lengths 
     del y_centroids 
     del y
@@ -328,11 +331,11 @@ def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.5):
         progress_bar = tqdm(dataloader, desc="Evaluating", leave=True)
         
         for batch in progress_bar:
-            X_seq, lengths, y , y_centroids = batch
-            X_seq, lengths, y , y_centroids = X_seq.to(device), lengths.to(device), y.to(device), y_centroids.to(device)
+            X_seq, lengths, meta, y , y_centroids = batch
+            X_seq, lengths, meta, y , y_centroids = X_seq.to(device), lengths.to(device), meta.to(device), y.to(device), y_centroids.to(device)
             dest_centroids = dest_centroids.to(device)
 
-            y_hat = model(X_seq, lengths)
+            y_hat = model(X_seq, lengths, meta)
 
             y_lat_lon_predicted = torch.sum(dest_centroids.unsqueeze(0) * y_hat.unsqueeze(-1), dim=1)
 
@@ -370,6 +373,7 @@ def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.5):
 
     del X_seq 
     del lengths 
+    del meta
     del y_centroids 
     del y
     
@@ -385,16 +389,16 @@ def eval_taxi_dataset(model, dataloader, dest_centroids, a = 0.5):
 
 if __name__ == "__main__":
 
-    data_path = "fl_platform\\src\\data\\processed\\new_porto_data\\new_porto_train_data_part_0_10.pkl"
+    data_path = "fl_platform\\src\\data\\processed\\meta_porto_data\\train_data_part_0_10.pkl"
     dataset = TaxiPortoDataset(data_path)
     
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=32,
         shuffle=True,
-        collate_fn=TaxiPortoDataset.sort_pad_collate
+        collate_fn=TaxiPortoDataset.random_sort_pad_collate
     )
-    test_dataset = TaxiPortoDataset("fl_platform\\src\\data\\processed\\new_porto_data\\new_porto_test_data.pkl")
+    test_dataset = TaxiPortoDataset("fl_platform\\src\\data\\processed\\meta_porto_data\\test_data.pkl")
 
     test_dataloader = torch.utils.data.DataLoader(
         test_dataset,
@@ -407,11 +411,13 @@ if __name__ == "__main__":
     dest_centroids = torch.tensor(dest_centroids_df[['latitude', 'longitude']].values, dtype=torch.float32)
 
     model = DropoffLSTM(2, 512, 1, len(dest_centroids))
+    # model.load_state_dict(torch.load("model_results\\model_55.pth", map_location=torch.device("cpu")))
 
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Total parameters: {total_params:,}")
-    print(f"Trainable parameters: {trainable_params:,}")
+    lr = 1e-4
+    # lr = 5e-5
+    train_taxi_dataset(model, dataloader, dest_centroids, lr=lr, epochs=3)
+    eval_taxi_dataset(model, test_dataloader, dest_centroids)
 
-    train_taxi_dataset(model, dataloader, dest_centroids, lr=1e-4, epochs=5)
-    eval_taxi_dataset(model, test_dataloader, dest_centroids, a=0.5)
+    # 2.3208868 - local test haversine distance
+    # 3.53022 - kaggle score 
+

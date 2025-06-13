@@ -541,13 +541,14 @@ class SimpleServer():
         pushgateway_server=f'http://pushgateway.deglazedrt.work:9091'
         while not self.server_stop.is_set():
             memory_info = process.memory_info()
-            # logging.info(f"Process memory usage: {memory_info.rss / 1024 ** 2} MiB")
-            metrics = f"""
-            server_memory{{client="server"}} {memory_info.rss / 1024 ** 2}
-            """
+            
+            logging.info(f"Process memory usage: {memory_info.rss / 1024 ** 2} MiB")
 
-            response = requests.post(
-                pushgateway_server + f"/metrics/job/server",
-                data=metrics.encode('utf-8')
-            )
-            time.sleep(3)
+            # metrics = f"""
+            # server_memory{{client="server"}} {memory_info.rss / 1024 ** 2}
+            # """
+            # response = requests.post(
+            #     pushgateway_server + f"/metrics/job/server",
+            #     data=metrics.encode('utf-8')
+            # )
+            time.sleep(10)

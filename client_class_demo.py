@@ -46,20 +46,20 @@ if(__name__ == "__main__"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
 
-    # # for docker
-    # # kafka_server='localhost:9092', #PLAINTEXT
-    # kafka_server='localhost:9095', #SSL
-    # localstack_server='http://localhost:4566'
+    # for docker
+    # kafka_server='localhost:9092', #PLAINTEXT
+    kafka_server='localhost:9095', #SSL
+    localstack_server='http://localhost:4566'
 
     # # for kubernetes
     # # minikube
     # kafka_server='localhost:30095', #SSL
     # localstack_server='http://localhost:30566'
 
-    # GCE
-    server_host = 'deglazedrt.work'
-    kafka_server=f'kafka.{server_host}:9095', #SSL
-    localstack_server=f'http://localstack.{server_host}:4566'
+    # # GCE
+    # server_host = 'deglazedrt.work'
+    # kafka_server=f'kafka.{server_host}:9095', #SSL
+    # localstack_server=f'http://localstack.{server_host}:4566'
 
     client = SimpleClient(
         model=model,
@@ -78,7 +78,7 @@ if(__name__ == "__main__"):
         key_file_path='kafka-certs/client-key.pem'
     )
     
-    warm_runs = 5
+    warm_runs = 0
 
     while True: 
         res = client.get_new_task()
@@ -126,24 +126,24 @@ if(__name__ == "__main__"):
             if stats:
                 training_info.update(stats)
             '''
-            if(warm_runs < 5):
-                dataloader = torch.utils.data.DataLoader(
-                        dataset,
-                        batch_size=32,
-                        shuffle=True,
-                        collate_fn=TaxiPortoDataset.sort_pad_collate
-                    )
-                warm_runs += 1
-            else:
-                dataloader = torch.utils.data.DataLoader(
-                    dataset,
-                    batch_size=32,
-                    shuffle=True,
-                    collate_fn=TaxiPortoDataset.random_sort_pad_collate
-                )
+            # if(warm_runs < 2):
+            #     dataloader = torch.utils.data.DataLoader(
+            #             dataset,
+            #             batch_size=32,
+            #             shuffle=True,
+            #             collate_fn=TaxiPortoDataset.sort_pad_collate
+            #         )
+            #     warm_runs += 1
+            # else:
+            dataloader = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=32,
+                shuffle=True,
+                collate_fn=TaxiPortoDataset.random_sort_pad_collate
+            )
 
             epochs = 3
-            lr = 1e-4
+            lr = 5e-5
 
             loss = train_taxi_dataset(model, dataloader, dest_centroids, lr=lr, epochs=epochs)
 
