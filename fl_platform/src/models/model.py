@@ -86,13 +86,15 @@ class DropoffLSTM(nn.Module):
         self.num_layers = num_layers
         self.arrival_clusters = arrival_clusters
 
-        self.embedding = nn.Linear(3, 16)
+        # self.embedding_meta = nn.Linear(3, 16)
+
+        # self.embedding_input = nn.Linear(input_size, 16)
 
         self.lstm = nn.LSTM(input_size, self.hidden_size, self.num_layers, batch_first=True)
         
         self.attention = Attention(self.hidden_size)
 
-        self.residual_connection = nn.Linear(self.hidden_size + 16, 1024)
+        self.residual_connection = nn.Linear(self.hidden_size + 3, 1024)
 
         self.residual_block = Residual(1024)
 
@@ -101,7 +103,8 @@ class DropoffLSTM(nn.Module):
         self.dropout = nn.Dropout(0.1)
 
     def forward(self, X_seq, X_seq_lengths, meta):
-        meta = F.relu(self.embedding(meta))
+        # meta = self.embedding_meta(meta)
+        # X_seq = self.embedding_input(X_seq)
 
         packed_X_seq = nn.utils.rnn.pack_padded_sequence(X_seq, X_seq_lengths.cpu(), batch_first=True, enforce_sorted=True)
         packed_lstm_out, (h, c) = self.lstm(packed_X_seq)

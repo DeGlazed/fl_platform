@@ -62,7 +62,7 @@ class CustomEvaluator(SimpleEvaluator):
         avg_loss, avg_e1_loss, avg_e2_loss, centroid_accuracy = eval_taxi_dataset(self.model, self.test_loader, self.dest_centroids)
         return {"loss": avg_e1_loss, "accuracy": centroid_accuracy}
 
-test_dataset = TaxiPortoDataset("fl_platform\\src\\data\\processed\\new_porto_data\\new_porto_test_data.pkl")
+test_dataset = TaxiPortoDataset("fl_platform\\src\\data\\processed\\meta_porto_data\\test_data.pkl")
 test_dataloader = torch.utils.data.DataLoader(
     test_dataset,
     batch_size=64,

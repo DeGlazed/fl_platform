@@ -394,7 +394,7 @@ if __name__ == "__main__":
     
     dataloader = torch.utils.data.DataLoader(
         dataset,
-        batch_size=32,
+        batch_size=2,
         shuffle=True,
         collate_fn=TaxiPortoDataset.random_sort_pad_collate
     )

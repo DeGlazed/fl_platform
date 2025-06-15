@@ -187,6 +187,130 @@ def get_client_quality_statistics(partition_id, num_partitions, label_mapping, d
         "sampling_regularity_std": 1/(np.median(sampling_regularity_stds) + 1e-8)
     }
 
+class TaxiPortoNonStandardizedDataset(Dataset):
+    def __init__(self, data_path) :
+        with open(data_path, 'rb') as f:
+            self.data = pickle.load(f)
+
+        self.stats = {"lat_mean" : 41.15940314187152,
+                "lat_std" : 0.07367446333478521,
+                "lon_mean" : -8.616175170744098,
+                "lon_std" : 0.05705206609122599
+        }
+
+    def _standardize(self, x_seq):
+        x_seq_array = np.array(x_seq)
+        x_seq_array[:, 0] = (x_seq_array[:, 0] - self.stats["lat_mean"]) / self.stats["lat_std"]
+        x_seq_array[:, 1] = (x_seq_array[:, 1] - self.stats["lon_mean"]) / self.stats["lon_std"]
+
+        return x_seq_array
+    
+    def _normalize(self, meta):
+        meta_array = np.array(meta, dtype=np.float32)
+
+        meta_array[0] = (meta_array[0] - 1) / 11
+        meta_array[1] = (meta_array[1] - 1) / 30
+        meta_array[2] = meta_array[2] / 23
+
+        return meta_array
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        item = self.data[idx]
+        
+        X_seq = item[0]
+        meta = item[1]
+        y = item[2]
+        y_centroid = item[3]
+
+        # X_seq_standardized = self._standardize(X_seq)
+        X_seq_standardized = np.array(X_seq, dtype=np.float32)
+        meta_normalized = self._normalize(meta)
+
+        return torch.tensor(X_seq_standardized, dtype=torch.float32), torch.tensor(meta_normalized, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(y_centroid, dtype=torch.long)
+
+    @staticmethod
+    def random_sort_pad_collate(batch):
+        X_sequences, meta, y, y_centroids = zip(*batch)
+
+        #random
+        X_random_sequences = []
+        for seq in X_sequences:
+            random_len = np.random.randint(1, len(seq) + 1)
+            X_random_sequences.append(seq[:random_len])
+
+        #sort
+        lengths = torch.tensor([len(seq) for seq in X_random_sequences])
+        sorted_len, sorted_idx = lengths.sort(0, descending=True)
+
+        X_sequences_sorted = [X_random_sequences[i] for i in sorted_idx]
+        meta_sorted = [meta[i] for i in sorted_idx]
+        y_centroids_sorted = [y_centroids[i] for i in sorted_idx]
+        y_sorted = [y[i] for i in sorted_idx]
+
+        #pad
+        X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
+
+        meta_out = torch.stack([target.clone().detach() for target in meta_sorted])
+        y_centroids_out = torch.tensor(y_centroids_sorted)
+        y_out = torch.stack([target.clone().detach() for target in y_sorted])
+
+        return X_padded_seq, sorted_len, meta_out, y_out, y_centroids_out
+    
+    def sort_pad_collate(batch):
+        X_sequences, meta, y, y_centroids = zip(*batch)
+
+        #sort
+        lengths = torch.tensor([len(seq) for seq in X_sequences])
+        sorted_len, sorted_idx = lengths.sort(0, descending=True)
+
+        X_sequences_sorted = [X_sequences[i] for i in sorted_idx]
+        meta_sorted = [meta[i] for i in sorted_idx]
+        y_centroids_sorted = [y_centroids[i] for i in sorted_idx]
+        y_sorted = [y[i] for i in sorted_idx]
+
+        #pad
+        X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
+
+        meta_out = torch.stack([target.clone().detach() for target in meta_sorted])
+        y_centroids_out = torch.tensor(y_centroids_sorted)
+        y_out = torch.stack([target.clone().detach() for target in y_sorted])
+
+        return X_padded_seq, sorted_len, meta_out, y_out, y_centroids_out
+
+    def seed_random_sort_pad_collate(batch):
+        torch.manual_seed(42)
+        torch.cuda.manual_seed(42)
+        np.random.seed(42)
+
+        X_sequences, meta, y, y_centroids = zip(*batch)
+
+        #random
+        X_random_sequences = []
+        for seq in X_sequences:
+            random_len = np.random.randint(1, len(seq) + 1)
+            X_random_sequences.append(seq[:random_len])
+
+        #sort
+        lengths = torch.tensor([len(seq) for seq in X_random_sequences])
+        sorted_len, sorted_idx = lengths.sort(0, descending=True)
+
+        X_sequences_sorted = [X_random_sequences[i] for i in sorted_idx]
+        meta_sorted = [meta[i] for i in sorted_idx]
+        y_centroids_sorted = [y_centroids[i] for i in sorted_idx]
+        y_sorted = [y[i] for i in sorted_idx]
+
+        #pad
+        X_padded_seq = torch.nn.utils.rnn.pad_sequence(X_sequences_sorted, batch_first=True)
+
+        meta_out = torch.stack([target.clone().detach() for target in meta_sorted])
+        y_centroids_out = torch.tensor(y_centroids_sorted)
+        y_out = torch.stack([target.clone().detach() for target in y_sorted])
+
+        return X_padded_seq, sorted_len, meta_out, y_out, y_centroids_out
+
 class TaxiPortoDataset(Dataset):
     def __init__(self, data_path) :
         with open(data_path, 'rb') as f:

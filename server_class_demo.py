@@ -3,7 +3,7 @@ from fl_platform.src.strategy.fed_fa import NaiveFedFA, SampleSizeAwareFedFA, Ti
 
 # strategy = NaiveFedFA(k=3)
 # strategy = SampleSizeAwareFedFA(k=3)
-strategy = TimestampSizeAwareFedFA(k=3)
+strategy = TimestampSizeAwareFedFA(k=6)
 # strategy = DataQualityAwareFedFA(k=3)
 
 # for docker
@@ -16,7 +16,7 @@ localstack_server='http://localhost:4566'
 # localstack_server='http://localhost:30566'
 
 server = SimpleServer(
-    min_clients=3,
+    min_clients=6,
     strategy=strategy,
 
     kafka_server=kafka_server,

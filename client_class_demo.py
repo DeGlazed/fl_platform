@@ -36,7 +36,7 @@ if(__name__ == "__main__"):
     '''
 
     print(f"Loading {partition_id} partition of Taxi Porto dataset")
-    data_path = f"fl_platform\\src\\data\\processed\\new_porto_data\\new_porto_train_data_part_{partition_id}_{num_partitions}.pkl"
+    data_path = f"fl_platform\\src\\data\\processed\\meta_porto_data\\train_data_part_{partition_id}_{num_partitions}.pkl"
     dataset = TaxiPortoDataset(data_path)
 
     dest_centroids_df = pd.read_csv("fl_platform\\src\\data\\processed\\new_porto_data\\end_point_centroids_k3400.csv")
@@ -126,24 +126,25 @@ if(__name__ == "__main__"):
             if stats:
                 training_info.update(stats)
             '''
-            # if(warm_runs < 2):
-            #     dataloader = torch.utils.data.DataLoader(
-            #             dataset,
-            #             batch_size=32,
-            #             shuffle=True,
-            #             collate_fn=TaxiPortoDataset.sort_pad_collate
-            #         )
-            #     warm_runs += 1
-            # else:
-            dataloader = torch.utils.data.DataLoader(
-                dataset,
-                batch_size=32,
-                shuffle=True,
-                collate_fn=TaxiPortoDataset.random_sort_pad_collate
-            )
+            if(warm_runs < 2):
+                dataloader = torch.utils.data.DataLoader(
+                        dataset,
+                        batch_size=32,
+                        shuffle=True,
+                        collate_fn=TaxiPortoDataset.sort_pad_collate
+                    )
+                warm_runs += 1
+            else:
+                dataloader = torch.utils.data.DataLoader(
+                    dataset,
+                    batch_size=32,
+                    shuffle=True,
+                    collate_fn=TaxiPortoDataset.random_sort_pad_collate
+                )
 
             epochs = 3
             lr = 5e-5
+            # lr = 1e-4
 
             loss = train_taxi_dataset(model, dataloader, dest_centroids, lr=lr, epochs=epochs)
 
