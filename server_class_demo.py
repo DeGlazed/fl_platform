@@ -3,20 +3,26 @@ from fl_platform.src.strategy.fed_fa import NaiveFedFA, SampleSizeAwareFedFA, Ti
 
 # strategy = NaiveFedFA(k=3)
 # strategy = SampleSizeAwareFedFA(k=3)
-strategy = TimestampSizeAwareFedFA(k=6)
+strategy = TimestampSizeAwareFedFA(k=3)
 # strategy = DataQualityAwareFedFA(k=3)
 
-# for docker
-# kafka_server='localhost:9092', #PLAINTEXT
-kafka_server='localhost:9095', #SSL
-localstack_server='http://localhost:4566'
+# # for docker
+# # kafka_server='localhost:9092', #PLAINTEXT
+# kafka_server='localhost:9095', #SSL
+# localstack_server='http://localhost:4566'
 
 ## for kubernetes
 # kafka_server='localhost:30095', #SSL
 # localstack_server='http://localhost:30566'
 
+# GCE
+server_host = 'deglazedrt.work'
+kafka_server=f'kafka.{server_host}:9095', #SSL
+localstack_server=f'http://localstack.{server_host}:4566'
+pushgateway_server=f'http://pushgateway.{server_host}:9091'
+
 server = SimpleServer(
-    min_clients=6,
+    min_clients=3,
     strategy=strategy,
 
     kafka_server=kafka_server,

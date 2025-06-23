@@ -150,7 +150,6 @@ class HaversineLoss(nn.Module):
         delta_lambda = lon2 - lon1
 
         a = torch.sin(delta_phi / 2) ** 2 + torch.cos(phi1) * torch.cos(phi2) * torch.sin(delta_lambda / 2) ** 2
-        a = torch.clamp(a, min=0.0, max=1.0)
         c = 2 * torch.atan2(torch.sqrt(a + 1e-8), torch.sqrt(1 - a + 1e-8))
         haversine = R * c
 
