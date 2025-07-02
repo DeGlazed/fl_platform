@@ -58,7 +58,7 @@ def load_train_test_data(partition_id, num_partitions, extractor=GeoLifeMobility
     torch.cuda.manual_seed(42)
     np.random.seed(42)
     
-    with open('fl_platform\src\data\processed\geolife_filtered_clean_data.pkl', 'rb') as f:
+    with open('fl_platform\src\data\processed\geolife_processed_data.pkl', 'rb') as f:
         geo_dataset = pickle.load(f)
     
     filter_geo_dataset = {}
@@ -175,13 +175,16 @@ def validate(model, device, dataloader):
     return loss, accuracy
 
 def test(model, dataloader, snapshots_path):
+
+    label_count = {0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[]}
+
     snapshot_files = sorted(os.listdir(snapshots_path))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Testing on device:", device)
     for snapshot_file in snapshot_files:
         snapshot_path = os.path.join(snapshots_path, snapshot_file)
         
-        if not snapshot_file.endswith('.pt'):
+        if not snapshot_file.endswith('.pth'):
             continue
         
         with open(snapshot_path, 'rb') as f:
@@ -204,6 +207,11 @@ def test(model, dataloader, snapshots_path):
                 loss = nn.CrossEntropyLoss()(outputs, labels)
                 total_loss += loss.item()
                 _, predicted = outputs.max(1)
+
+                # Collect predictions for each label
+                for i, label in enumerate(labels):
+                    label_count[label.item()].append(predicted[i].item())
+
                 correct += predicted.eq(labels).sum().item()
                 total += labels.size(0)
 
@@ -213,6 +221,15 @@ def test(model, dataloader, snapshots_path):
         with open(logs_path, 'a') as f:
             f.write(f"{snapshot_file}: Loss={loss:.4f}, Accuracy={accuracy:.2f}%\n")
         print({"loss": total_loss / len(dataloader), "accuracy": accuracy})
+
+        # Count distinct values for each label
+        label_distinct_counts = {}
+        for label, predictions in label_count.items():
+            unique_predictions, counts = np.unique(predictions, return_counts=True)
+            label_distinct_counts[label] = dict(zip(unique_predictions, counts))
+        
+        print(label_distinct_counts)
+
     # torch.cuda.empty_cache()  # Clear GPU memory
 
 
